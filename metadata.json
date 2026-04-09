@@ -1,0 +1,5 @@
+{
+  "name": "AraCare",
+  "description": "A clinic management system for tracking follow-up cases and patient care.",
+  "requestFramePermissions": []
+}

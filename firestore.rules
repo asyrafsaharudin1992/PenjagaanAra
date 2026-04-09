@@ -1,0 +1,152 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string
+    //   - role: string (Doctor, Admin, Superadmin) (required)
+    //   - permissions: list (required)
+    //   - createdAt: string (ISO date)
+    //
+    // Collection: patients
+    // Document ID: {patientId}
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - phone: string (required)
+    //   - email: string
+    //   - dateOfBirth: string
+    //
+    // Collection: cases
+    // Document ID: {caseId}
+    // Fields:
+    //   - id: string (required)
+    //   - patientName: string (required)
+    //   - branch: string (Kajang, Seri Kembangan) (required)
+    //   - diagnosis: string (required)
+    //   - lastVisitDate: string
+    //   - nextFollowUpDate: string (required)
+    //   - doctorInCharge: string (required)
+    //   - remarks: string
+    //   - followUpDoneBy: string
+    //   - followUpTag: string (required)
+    //   - createdAt: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperadmin() {
+      return isAuthenticated() && 
+        (
+          request.auth.token.email == "atikah.abdrahman@gmail.com" ||
+          request.auth.token.email == "operation@hsohealthcare.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Superadmin')
+        );
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (
+          isSuperadmin() || 
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin')
+        );
+    }
+
+    function isDoctor() {
+      return isAuthenticated() && 
+        (
+          isAdmin() || 
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Doctor')
+        );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'permissions']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['Doctor', 'Admin', 'Superadmin'] &&
+             data.permissions is list;
+    }
+
+    function isValidCase(data) {
+      return data.keys().hasAll(['id', 'patientId', 'patientName', 'branch', 'diagnosis', 'doctorInCharge', 'followUpTag']) &&
+             data.id is string &&
+             data.patientId is string &&
+             data.patientName is string &&
+             data.branch in ['Kajang', 'Seri Kembangan'] &&
+             data.diagnosis is string &&
+             data.doctorInCharge is string &&
+             data.followUpTag is string &&
+             data.followUpTag.size() > 0 &&
+             data.followUpTag.size() < 100 &&
+             (!('patientPhone' in data) || data.patientPhone is string) &&
+             (!('appointmentDate' in data) || data.appointmentDate is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isOwner(uid) || isSuperadmin()) && isValidUser(request.resource.data);
+      allow update: if (isOwner(uid) || isSuperadmin()) && isValidUser(request.resource.data);
+      allow delete: if isSuperadmin();
+    }
+
+    match /patients/{patientId} {
+      allow read: if isDoctor();
+      allow write: if isAdmin();
+    }
+
+    match /cases/{caseId} {
+      allow read: if isDoctor();
+      allow create: if isDoctor() && isValidCase(request.resource.data);
+      allow update: if isDoctor() && isValidCase(request.resource.data);
+      allow delete: if isSuperadmin();
+    }
+
+    match /wellness_updates/{updateId} {
+      allow create, update: if true;
+      allow read: if isDoctor();
+      allow delete: if isAdmin();
+    }
+
+    match /public_followups/{requestId} {
+      allow create: if true;
+      allow read, update, delete: if isDoctor();
+    }
+
+    match /todo/{todoId} {
+      allow create: if true;
+      allow read, update, delete: if isDoctor();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user roles and profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["Doctor", "Admin", "Superadmin"] },
+        "permissions": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "List of granular permissions granted to the user."
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Patient demographic information.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "dateOfBirth": { "type": "string", "format": "date" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "FollowUpCase": {
+      "title": "Follow-up Case",
+      "description": "A follow-up task for a patient.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string", "description": "User keyed-in ID" },
+        "patientName": { "type": "string" },
+        "branch": { "type": "string", "enum": ["Kajang", "Seri Kembangan"] },
+        "diagnosis": { "type": "string" },
+        "lastVisitDate": { "type": "string", "format": "date" },
+        "nextFollowUpDate": { "type": "string", "format": "date" },
+        "doctorInCharge": { "type": "string" },
+        "remarks": { "type": "string" },
+        "followUpDoneBy": { "type": "string" },
+        "followUpTag": { "type": "string", "description": "Dynamic tag for the follow-up case (e.g. aramommy, arahaji)" },
+        "patientPhone": { "type": "string", "description": "Required for new patients" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "patientName", "branch", "diagnosis", "nextFollowUpDate", "doctorInCharge", "followUpTag"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/patients/{patientId}": {
+      "schema": "Patient",
+      "description": "Patient records."
+    },
+    "/cases/{caseId}": {
+      "schema": "FollowUpCase",
+      "description": "Follow-up case records."
+    }
+  }
+}
