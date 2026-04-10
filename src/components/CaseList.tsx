@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { FollowUpCase, FollowUpTag, UserPermission } from '../types';
 import { cn } from '../lib/utils';
 import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 
 interface CaseListProps {
   cases: FollowUpCase[];
@@ -86,7 +86,20 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                           c.diagnosis.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           c.doctorInCharge.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           c.patientId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || c.followUpTag === statusFilter;
+                          
+    let matchesStatus = true;
+    if (statusFilter !== 'All') {
+      const normalizedTag = c.followUpTag.toLowerCase().trim();
+      const filterLower = statusFilter.toLowerCase().trim();
+      
+      if (filterLower === 'referral') {
+        matchesStatus = normalizedTag.includes('referral');
+      } else if (filterLower.includes('arawellness')) {
+        matchesStatus = normalizedTag.includes('arawellness');
+      } else {
+        matchesStatus = normalizedTag === filterLower;
+      }
+    }
     
     const caseDate = new Date(c.createdAt);
     caseDate.setHours(0, 0, 0, 0);
@@ -195,7 +208,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Patient</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Diagnosis</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Appt Date</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Visit Date</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Doctor</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tag</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
@@ -213,15 +226,22 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                   </td>
                   <td className="px-4 py-3">
                     <div className="min-w-0">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setHistoryPatientId(c.patientId);
-                        }}
-                        className="text-xs font-bold text-slate-900 hover:text-indigo-600 hover:underline text-left whitespace-normal break-words"
-                      >
-                        {c.patientName}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHistoryPatientId(c.patientId);
+                          }}
+                          className="text-xs font-bold text-slate-900 hover:text-indigo-600 hover:underline text-left whitespace-normal break-words"
+                        >
+                          {c.patientName}
+                        </button>
+                        {c.followUpTag.toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied && (
+                          <span title="Remarks added. Please copy notes to clinic system." className="flex-shrink-0">
+                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-400 mt-0.5">ID: {c.patientId}</p>
                     </div>
                   </td>
@@ -237,7 +257,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-                      {c.appointmentDate ? new Date(c.appointmentDate).toLocaleDateString() : '-'}
+                      {c.lastVisitDate ? new Date(c.lastVisitDate).toLocaleDateString() : '-'}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
@@ -271,7 +291,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                             e.stopPropagation();
                             let wellnessText = '';
                             
-                            if (c.followUpTag.toLowerCase() === 'arawellness (weight loss)') {
+                            if (c.followUpTag.toLowerCase().includes('arawellness')) {
                               toast.loading('Mengambil data wellness...', { id: 'fetch-wellness' });
                               try {
                                 const q = query(collection(db, 'wellness_updates'), where('caseId', '==', c.id));
@@ -306,7 +326,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                               `Patient ID: ${c.patientId}`,
                               `Branch: ${c.branch}`,
                               `Doctor In Charge: ${c.doctorInCharge}`,
-                              `Appointment Date: ${c.appointmentDate ? new Date(c.appointmentDate).toLocaleDateString() : '-'}`,
+                              `Visit Date: ${c.lastVisitDate ? new Date(c.lastVisitDate).toLocaleDateString() : '-'}`,
                               `Tag: ${c.followUpTag}`,
                               `Diagnosis: ${c.diagnosis}`,
                               `Remarks: ${c.remarks || 'None'}`,
@@ -316,6 +336,10 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                             try {
                               await navigator.clipboard.writeText(textToCopy);
                               toast.success('Notes copied to clipboard!');
+                              
+                              if (c.followUpTag.toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied) {
+                                await updateDoc(doc(db, 'cases', c.id), { isNotesCopied: true });
+                              }
                             } catch (err) {
                               setShareModal({ 
                                 isOpen: true, 
@@ -325,6 +349,10 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                                 title: 'Copy Notes',
                                 instruction: 'Sila salin nota di bawah:'
                               });
+                              
+                              if (c.followUpTag.toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied) {
+                                await updateDoc(doc(db, 'cases', c.id), { isNotesCopied: true });
+                              }
                             }
                           }}
                           className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors font-bold text-[10px] uppercase tracking-wider"
@@ -337,7 +365,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
                         </div>
                       </div>
-                      {c.followUpTag.toLowerCase() === 'arawellness (weight loss)' && (
+                      {c.followUpTag.toLowerCase().includes('arawellness') && (
                         <div className="relative group/btn flex items-center justify-center">
                           <button
                             onClick={async (e) => {
@@ -395,7 +423,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                           </div>
                         </div>
                       )}
-                      {(c.followUpTag.toLowerCase() === 'referral' || c.followUpTag.toLowerCase() === 'referral cases') && (
+                      {c.followUpTag.toLowerCase().includes('referral') && (
                         <div className="relative group/btn flex items-center justify-center">
                           <button
                             onClick={(e) => {
@@ -607,21 +635,38 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
 }
 
 function TagBadge({ tag }: { tag: FollowUpTag }) {
-  const styles: Record<FollowUpTag, string> = {
+  const normalizedTag = tag.toLowerCase().trim();
+  let styleKey = normalizedTag;
+  let displayTag = tag;
+
+  if (normalizedTag.includes('referral')) {
+    styleKey = 'referral';
+    displayTag = 'Referral';
+  } else if (normalizedTag.includes('arawellness')) {
+    styleKey = 'arawellness';
+    displayTag = 'AraWellness';
+  } else if (normalizedTag === 'aramommy') {
+    styleKey = 'aramommy';
+    displayTag = 'AraMommy';
+  } else if (normalizedTag === 'arachronic') {
+    styleKey = 'arachronic';
+    displayTag = 'AraChronic';
+  }
+
+  const styles: Record<string, string> = {
     'aramommy': "bg-pink-50 text-pink-700 border-pink-100",
     'arachronic': "bg-blue-50 text-blue-700 border-blue-100",
-    'arawellness (weight loss)': "bg-emerald-50 text-emerald-700 border-emerald-100",
+    'arawellness': "bg-emerald-50 text-emerald-700 border-emerald-100",
     'referral': "bg-indigo-50 text-indigo-700 border-indigo-100",
-    'referral cases': "bg-indigo-50 text-indigo-700 border-indigo-100",
     'others': "bg-slate-50 text-slate-700 border-slate-100",
   };
 
   return (
     <span className={cn(
       "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider",
-      styles[tag]
+      styles[styleKey] || styles['others']
     )}>
-      {tag}
+      {displayTag}
     </span>
   );
 }

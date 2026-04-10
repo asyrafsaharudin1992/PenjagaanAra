@@ -30,10 +30,12 @@ interface DashboardProps {
 export default function Dashboard({ cases, userName, onFilterByTag }: DashboardProps) {
   // Dynamic stats based on actual tags in the system
   const normalizeTag = (tag: string) => {
-    if (tag === 'aramommy') return 'AraMommy';
-    if (tag === 'arahaji') return 'AraHaji';
-    if (tag === 'arawellness (weight loss)') return 'AraWellness (weight loss)';
-    if (tag === 'referral cases' || tag === 'referral') return 'Referral';
+    const lowerTag = tag.toLowerCase().trim();
+    if (lowerTag === 'aramommy') return 'AraMommy';
+    if (lowerTag === 'arachronic') return 'AraChronic';
+    if (lowerTag === 'arahaji') return 'AraHaji';
+    if (lowerTag.includes('arawellness')) return 'AraWellness';
+    if (lowerTag.includes('referral')) return 'Referral';
     return tag;
   };
 

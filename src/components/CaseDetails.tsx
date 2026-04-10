@@ -59,7 +59,7 @@ export default function CaseDetails({
   const [editedDoctorInCharge, setEditedDoctorInCharge] = useState(caseData.doctorInCharge || '');
 
   useEffect(() => {
-    if (caseData.followUpTag.toLowerCase() !== 'arawellness (weight loss)') return;
+    if (!caseData.followUpTag.toLowerCase().includes('arawellness')) return;
 
     const q = query(
       collection(db, 'wellness_updates'),
@@ -124,13 +124,19 @@ export default function CaseDetails({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onUpdate(caseData.id, { 
+      const updates: Partial<FollowUpCase> = {
         followUpTag: editedTag,
         remarks: editedRemarks,
         diagnosis: editedDiagnosis,
         branch: editedBranch as ClinicBranch,
         doctorInCharge: editedDoctorInCharge
-      });
+      };
+
+      if (editedRemarks !== caseData.remarks) {
+        updates.isNotesCopied = false;
+      }
+
+      await onUpdate(caseData.id, updates);
       onClose();
     } catch (error) {
       console.error("Failed to save changes:", error);

@@ -45,6 +45,7 @@ export interface FollowUpCase {
   followUpDoneBy: string;
   followUpTag: FollowUpTag;
   patientPhone?: string;
+  isNotesCopied?: boolean;
   createdAt: string;
 }
 

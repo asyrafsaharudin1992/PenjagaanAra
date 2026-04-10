@@ -309,7 +309,6 @@ export default function CaseForm({ onClose, onSubmit, existingCases }: CaseFormP
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Appointment Date</label>
               <input 
-                required
                 type="date"
                 value={formData.appointmentDate}
                 onChange={e => setFormData({...formData, appointmentDate: e.target.value})}
