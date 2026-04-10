@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 interface TodoItem {
   id: string;
   patientName: string;
+  visitDate?: string;
   date: string;
   doctorName: string;
   branch: string;
@@ -107,10 +108,20 @@ export default function TodoList() {
                   </div>
                 </div>
 
+                {todo.visitDate && (
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-4 h-4 text-slate-400 mt-1" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Visit Date</p>
+                      <p className="text-sm font-medium text-slate-700">{todo.visitDate}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-start gap-3">
                   <Calendar className="w-4 h-4 text-slate-400 mt-1" />
                   <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Follow-up Date</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Suggested Follow-up</p>
                     <p className="text-sm font-medium text-slate-700">{todo.date}</p>
                   </div>
                 </div>

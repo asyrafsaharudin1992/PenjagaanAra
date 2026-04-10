@@ -395,6 +395,32 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                           </div>
                         </div>
                       )}
+                      {c.followUpTag.toLowerCase() === 'referral cases' && (
+                        <div className="relative group/btn flex items-center justify-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const message = `Salam tuan/puan, saya daripada Klinik ARA 24 Jam, terima kasih kerana mendapatkan perkhidmatan di klinik kami.\n\nBoleh saya tahu keadaan ${c.patientName} setelah dirujuk ke hospital tempoh hari?`;
+                              setShareModal({ 
+                                isOpen: true, 
+                                caseData: c, 
+                                text: message, 
+                                isLoading: false,
+                                title: 'WhatsApp Referral Case',
+                                instruction: 'Sila salin mesej di bawah dan hantar kepada pesakit melalui WhatsApp:'
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors font-bold text-[10px] uppercase tracking-wider"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            Message
+                          </button>
+                          <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
+                            WhatsApp Referral Message
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                          </div>
+                        </div>
+                      )}
                       <div className="relative group/btn flex items-center justify-center">
                         <button 
                           onClick={(e) => {

@@ -13,6 +13,7 @@ export default function PublicFollowUpForm({ onClose }: PublicFollowUpFormProps)
   const [isSuccess, setIsSuccess] = useState(false);
   const [formData, setFormData] = useState({
     patientName: '',
+    visitDate: new Date().toISOString().split('T')[0],
     date: new Date().toISOString().split('T')[0],
     doctorName: '',
     branch: 'Kajang',
@@ -96,7 +97,20 @@ export default function PublicFollowUpForm({ onClose }: PublicFollowUpFormProps)
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-              <Calendar className="w-3 h-3" /> Follow-up Date
+              <Calendar className="w-3 h-3" /> Visit Date
+            </label>
+            <input 
+              required
+              type="date"
+              value={formData.visitDate}
+              onChange={(e) => setFormData({...formData, visitDate: e.target.value})}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <Calendar className="w-3 h-3" /> Suggested Follow-up Date
             </label>
             <input 
               required
