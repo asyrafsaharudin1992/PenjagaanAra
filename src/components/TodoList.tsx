@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { User, Calendar, Stethoscope, MessageSquare, Trash2, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { User, Calendar, Stethoscope, MessageSquare, Trash2, CheckCircle, Clock, Loader2, Edit2, X, Save } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 
@@ -20,6 +20,8 @@ interface TodoItem {
 export default function TodoList() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
+  const [editForm, setEditForm] = useState<Partial<TodoItem>>({});
 
   useEffect(() => {
     const q = query(collection(db, 'todo'), orderBy('createdAt', 'desc'));
@@ -58,6 +60,30 @@ export default function TodoList() {
     }
   };
 
+  const startEdit = (todo: TodoItem) => {
+    setEditingTodo(todo);
+    setEditForm(todo);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTodo) return;
+    try {
+      await updateDoc(doc(db, 'todo', editingTodo.id), {
+        patientName: editForm.patientName,
+        visitDate: editForm.visitDate,
+        date: editForm.date,
+        doctorName: editForm.doctorName,
+        branch: editForm.branch,
+        reason: editForm.reason,
+      });
+      toast.success("Item updated successfully.");
+      setEditingTodo(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `todo/${editingTodo.id}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -91,12 +117,20 @@ export default function TodoList() {
                   {todo.status === 'completed' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                   {todo.status}
                 </div>
-                <button 
-                  onClick={() => handleDelete(todo.id)}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => startEdit(todo)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(todo.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -168,6 +202,113 @@ export default function TodoList() {
           ))
         )}
       </div>
+
+      {editingTodo && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
+              <div>
+                <h2 className="text-xl font-bold">Edit Follow-up</h2>
+                <p className="text-indigo-100 text-xs">Update patient details</p>
+              </div>
+              <button onClick={() => setEditingTodo(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdate} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <User className="w-3 h-3" /> Patient Name
+                </label>
+                <input 
+                  required
+                  type="text"
+                  value={editForm.patientName || ''}
+                  onChange={(e) => setEditForm({...editForm, patientName: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-3 h-3" /> Visit Date
+                </label>
+                <input 
+                  type="date"
+                  value={editForm.visitDate || ''}
+                  onChange={(e) => setEditForm({...editForm, visitDate: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-3 h-3" /> Suggested Follow-up Date
+                </label>
+                <input 
+                  required
+                  type="date"
+                  value={editForm.date || ''}
+                  onChange={(e) => setEditForm({...editForm, date: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <Stethoscope className="w-3 h-3" /> Doctor Name
+                </label>
+                <input 
+                  required
+                  type="text"
+                  value={editForm.doctorName || ''}
+                  onChange={(e) => setEditForm({...editForm, doctorName: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <User className="w-3 h-3" /> Branch
+                </label>
+                <select 
+                  required
+                  value={editForm.branch || ''}
+                  onChange={(e) => setEditForm({...editForm, branch: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                >
+                  <option value="Kajang">Kajang</option>
+                  <option value="Seri Kembangan">Seri Kembangan</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                  <MessageSquare className="w-3 h-3" /> Reason for Follow-up
+                </label>
+                <textarea 
+                  required
+                  rows={3}
+                  value={editForm.reason || ''}
+                  onChange={(e) => setEditForm({...editForm, reason: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                >
+                  <Save className="w-5 h-5" />
+                  SAVE CHANGES
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
