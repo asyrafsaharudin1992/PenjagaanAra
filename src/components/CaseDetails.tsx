@@ -14,7 +14,7 @@ import {
   MessageCircle,
   Activity
 } from 'lucide-react';
-import { FollowUpCase, FollowUpTag, UserRole, UserPermission } from '../types';
+import { FollowUpCase, FollowUpTag, UserRole, UserPermission, ClinicBranch } from '../types';
 import { summarizeCase } from '../services/gemini';
 import { cn } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
@@ -55,6 +55,8 @@ export default function CaseDetails({
   const [editedRemarks, setEditedRemarks] = useState(caseData.remarks || '');
   const [editedDiagnosis, setEditedDiagnosis] = useState(caseData.diagnosis || '');
   const [editedTag, setEditedTag] = useState(caseData.followUpTag);
+  const [editedBranch, setEditedBranch] = useState(caseData.branch || 'Kajang');
+  const [editedDoctorInCharge, setEditedDoctorInCharge] = useState(caseData.doctorInCharge || '');
 
   useEffect(() => {
     if (caseData.followUpTag.toLowerCase() !== 'arawellness (weight loss)') return;
@@ -90,7 +92,7 @@ export default function CaseDetails({
     return () => unsubscribe();
   }, [caseData.id, caseData.followUpTag]);
 
-  const defaultTags = ['aramommy', 'arachronic', 'arawellness (weight loss)', 'referral cases', 'others'];
+  const defaultTags = ['aramommy', 'arachronic', 'arawellness (weight loss)', 'referral', 'others'];
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const canDelete = userPermissions.includes('delete_case');
@@ -125,7 +127,9 @@ export default function CaseDetails({
       await onUpdate(caseData.id, { 
         followUpTag: editedTag,
         remarks: editedRemarks,
-        diagnosis: editedDiagnosis
+        diagnosis: editedDiagnosis,
+        branch: editedBranch as ClinicBranch,
+        doctorInCharge: editedDoctorInCharge
       });
       onClose();
     } catch (error) {
@@ -225,9 +229,14 @@ export default function CaseDetails({
                 </div>
                 <div>
                   <p className="font-bold text-slate-900 text-lg">{caseData.patientName}</p>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full uppercase tracking-wider">
-                    {caseData.branch} Branch
-                  </span>
+                  <select 
+                    value={editedBranch}
+                    onChange={(e) => setEditedBranch(e.target.value as ClinicBranch)}
+                    className="mt-1 text-[10px] font-bold px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full uppercase tracking-wider border-none focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                  >
+                    <option value="Kajang">Kajang Branch</option>
+                    <option value="Seri Kembangan">Seri Kembangan Branch</option>
+                  </select>
                 </div>
               </div>
               <div className="text-right">
@@ -238,8 +247,14 @@ export default function CaseDetails({
 
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/60">
               <div>
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Doctor In Charge</p>
-                <p className="text-sm font-medium text-slate-700">{caseData.doctorInCharge}</p>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Doctor In Charge</p>
+                <input 
+                  type="text"
+                  value={editedDoctorInCharge}
+                  onChange={(e) => setEditedDoctorInCharge(e.target.value)}
+                  className="w-full text-sm font-medium text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  placeholder="Doctor Name"
+                />
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last Visit</p>

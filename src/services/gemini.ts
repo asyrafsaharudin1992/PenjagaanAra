@@ -37,7 +37,7 @@ export async function suggestUrgency(diagnosis: string) {
         "aramommy" (maternity/pregnancy), 
         "arachronic" (chronic diseases like diabetes, hypertension), 
         "arawellness (weight loss)" (weight management/wellness), 
-        "referral cases" (specialist referrals), 
+        "referral" (specialist referrals), 
         or "others".
         
         Diagnosis: ${diagnosis}

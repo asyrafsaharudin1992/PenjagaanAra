@@ -395,7 +395,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                           </div>
                         </div>
                       )}
-                      {c.followUpTag.toLowerCase() === 'referral cases' && (
+                      {(c.followUpTag.toLowerCase() === 'referral' || c.followUpTag.toLowerCase() === 'referral cases') && (
                         <div className="relative group/btn flex items-center justify-center">
                           <button
                             onClick={(e) => {
@@ -611,6 +611,7 @@ function TagBadge({ tag }: { tag: FollowUpTag }) {
     'aramommy': "bg-pink-50 text-pink-700 border-pink-100",
     'arachronic': "bg-blue-50 text-blue-700 border-blue-100",
     'arawellness (weight loss)': "bg-emerald-50 text-emerald-700 border-emerald-100",
+    'referral': "bg-indigo-50 text-indigo-700 border-indigo-100",
     'referral cases': "bg-indigo-50 text-indigo-700 border-indigo-100",
     'others': "bg-slate-50 text-slate-700 border-slate-100",
   };

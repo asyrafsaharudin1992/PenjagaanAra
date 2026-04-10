@@ -33,7 +33,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
     if (tag === 'aramommy') return 'AraMommy';
     if (tag === 'arahaji') return 'AraHaji';
     if (tag === 'arawellness (weight loss)') return 'AraWellness (weight loss)';
-    if (tag === 'referral cases') return 'Referral';
+    if (tag === 'referral cases' || tag === 'referral') return 'Referral';
     return tag;
   };
 
