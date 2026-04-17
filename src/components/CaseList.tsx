@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
 import { 
   Search, 
@@ -41,6 +41,19 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [historyPatientId, setHistoryPatientId] = useState<string | null>(null);
+  // Derive available tags directly from cases prop so the dropdown always
+  // reflects real data — no separate Firestore collection to maintain,
+  // and new tags added to cases appear immediately.
+  // canonicalizeTag collapses variants with different casing or spelling
+  // (e.g. 'aramommy', 'AraMommy' → 'AraMommy') into a single entry.
+  const availableTags = useMemo(() => {
+    const seen = new Set<string>();
+    cases.forEach(c => {
+      if (c.followUpTag) seen.add(canonicalizeTag(c.followUpTag));
+    });
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [cases]);
+
   const [shareModal, setShareModal] = useState<{
     isOpen: boolean;
     caseData: FollowUpCase | null;
@@ -82,14 +95,14 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
   };
 
   const filteredCases = cases.filter(c => {
-    const matchesSearch = c.patientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          c.diagnosis.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          c.doctorInCharge.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          c.patientId.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (c.patientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                          (c.diagnosis?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                          (c.doctorInCharge?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                          (c.patientId?.toLowerCase() || '').includes(searchTerm.toLowerCase());
                           
     let matchesStatus = true;
     if (statusFilter !== 'All') {
-      const normalizedTag = c.followUpTag.toLowerCase().trim();
+      const normalizedTag = (c.followUpTag || '').toLowerCase().trim();
       const filterLower = statusFilter.toLowerCase().trim();
       
       if (filterLower === 'referral') {
@@ -166,11 +179,9 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
             className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
           >
             <option value="All">All Tags</option>
-            <option value="AraMommy">AraMommy</option>
-            <option value="AraHaji">AraHaji</option>
-            <option value="AraWellness (weight loss)">AraWellness (weight loss)</option>
-            <option value="Referral">Referral</option>
-            <option value="others">others</option>
+            {availableTags.map(tag => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
           </select>
           <div className="flex items-center gap-2">
             <input
@@ -236,7 +247,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                         >
                           {c.patientName}
                         </button>
-                        {c.followUpTag.toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied && (
+                        {(c.followUpTag || '').toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied && (
                           <span title="Remarks added. Please copy notes to clinic system." className="flex-shrink-0">
                             <AlertCircle className="w-4 h-4 text-amber-500" />
                           </span>
@@ -291,7 +302,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                             e.stopPropagation();
                             let wellnessText = '';
                             
-                            if (c.followUpTag.toLowerCase().includes('arawellness')) {
+                            if ((c.followUpTag || '').toLowerCase().includes('arawellness')) {
                               toast.loading('Mengambil data wellness...', { id: 'fetch-wellness' });
                               try {
                                 const q = query(collection(db, 'wellness_updates'), where('caseId', '==', c.id));
@@ -323,12 +334,9 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                             const textToCopy = [
                               `"Follow up notes"`,
                               `Patient Name: ${c.patientName}`,
-                              `Patient ID: ${c.patientId}`,
                               `Branch: ${c.branch}`,
                               `Doctor In Charge: ${c.doctorInCharge}`,
                               `Visit Date: ${c.lastVisitDate ? new Date(c.lastVisitDate).toLocaleDateString() : '-'}`,
-                              `Tag: ${c.followUpTag}`,
-                              `Diagnosis: ${c.diagnosis}`,
                               `Remarks: ${c.remarks || 'None'}`,
                               wellnessText
                             ].filter(Boolean).join('\n');
@@ -337,7 +345,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                               await navigator.clipboard.writeText(textToCopy);
                               toast.success('Notes copied to clipboard!');
                               
-                              if (c.followUpTag.toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied) {
+                              if ((c.followUpTag || '').toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied) {
                                 await updateDoc(doc(db, 'cases', c.id), { isNotesCopied: true });
                               }
                             } catch (err) {
@@ -350,7 +358,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                                 instruction: 'Sila salin nota di bawah:'
                               });
                               
-                              if (c.followUpTag.toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied) {
+                              if ((c.followUpTag || '').toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied) {
                                 await updateDoc(doc(db, 'cases', c.id), { isNotesCopied: true });
                               }
                             }
@@ -365,7 +373,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
                         </div>
                       </div>
-                      {c.followUpTag.toLowerCase().includes('arawellness') && (
+                      {(c.followUpTag || '').toLowerCase().includes('arawellness') && (
                         <div className="relative group/btn flex items-center justify-center">
                           <button
                             onClick={async (e) => {
@@ -423,7 +431,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
                           </div>
                         </div>
                       )}
-                      {c.followUpTag.toLowerCase().includes('referral') && (
+                      {(c.followUpTag || '').toLowerCase().includes('referral') && (
                         <div className="relative group/btn flex items-center justify-center">
                           <button
                             onClick={(e) => {
@@ -634,10 +642,23 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
   );
 }
 
+// Collapses all known tag variants into one canonical display name so the
+// dropdown shows each logical tag exactly once regardless of how it was typed.
+function canonicalizeTag(tag: string): string {
+  const t = (tag || '').toLowerCase().trim();
+  if (t === 'aramommy')             return 'AraMommy';
+  if (t === 'arachronic')           return 'AraChronic';
+  if (t.includes('arawellness'))    return 'AraWellness (weight loss)';
+  if (t.includes('referral'))       return 'Referral';
+  if (t === 'others')               return 'Others';
+  // Unknown tags: keep original but trimmed
+  return tag.trim();
+}
+
 function TagBadge({ tag }: { tag: FollowUpTag }) {
-  const normalizedTag = tag.toLowerCase().trim();
+  const normalizedTag = (tag || '').toLowerCase().trim();
   let styleKey = normalizedTag;
-  let displayTag = tag;
+  let displayTag = tag || 'Unknown';
 
   if (normalizedTag.includes('referral')) {
     styleKey = 'referral';

@@ -16,13 +16,8 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
     { id: 'cases', label: 'Follow-up Cases', icon: ClipboardList, permission: 'view_history' as UserPermission },
     { id: 'todo', label: 'To Do List', icon: ClipboardList, permission: 'view_history' as UserPermission },
     { id: 'patients', label: 'Patients', icon: Users, permission: 'view_history' as UserPermission },
-    { id: 'public_requests', label: 'Public Requests', icon: MessageSquare, permission: 'manage_users' as UserPermission },
     { id: 'users', label: 'Users', icon: UserIcon, permission: 'manage_users' as UserPermission },
   ];
-
-  const visibleItems = menuItems.filter(item => 
-    !item.permission || user.permissions?.includes(item.permission)
-  );
 
   return (
     <div className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col sticky top-0">
@@ -35,7 +30,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
         </div>
 
         <nav className="space-y-1">
-          {visibleItems.map((item) => (
+          {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
@@ -81,4 +76,3 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
     </div>
   );
 }
-

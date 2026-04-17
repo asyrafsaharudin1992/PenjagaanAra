@@ -59,6 +59,7 @@ service cloud.firestore {
         (
           request.auth.token.email == "atikah.abdrahman@gmail.com" ||
           request.auth.token.email == "operation@hsohealthcare.com" ||
+          request.auth.token.email == "admin@hsohealthcare.com" ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Superadmin')
         );
     }
@@ -88,6 +89,7 @@ service cloud.firestore {
              data.uid is string &&
              data.email is string &&
              data.role in ['Doctor', 'Admin', 'Superadmin'] &&
+             (!('branch' in data) || data.branch in ['Kajang', 'Seri Kembangan']) &&
              data.permissions is list;
     }
 
@@ -102,8 +104,23 @@ service cloud.firestore {
              data.followUpTag is string &&
              data.followUpTag.size() > 0 &&
              data.followUpTag.size() < 100 &&
+             (!('createdByEmail' in data) || data.createdByEmail is string) &&
+             (!('createdByUid' in data) || data.createdByUid is string) &&
              (!('patientPhone' in data) || data.patientPhone is string) &&
              (!('appointmentDate' in data) || data.appointmentDate is string);
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['patientNames', 'remarks', 'branch', 'createdByEmail']) &&
+             data.patientNames is string && data.patientNames.size() > 0 && data.patientNames.size() < 1000 &&
+             data.remarks is string && data.remarks.size() > 0 && data.remarks.size() < 5000 &&
+             data.branch in ['Kajang', 'Seri Kembangan'] &&
+             data.createdByEmail is string && data.createdByEmail.size() < 200;
+    }
+
+    function userHasBranchAccess(branch) {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return userData.branch == branch || userData.role == 'Superadmin';
     }
 
     // ===============================================================
@@ -123,9 +140,16 @@ service cloud.firestore {
     }
 
     match /cases/{caseId} {
-      allow read: if isDoctor();
-      allow create: if isDoctor() && isValidCase(request.resource.data);
-      allow update: if isDoctor() && isValidCase(request.resource.data);
+      allow read: if isDoctor() && (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(resource.data.branch)));
+      allow create: if isDoctor() && isValidCase(request.resource.data) && 
+                    (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(request.resource.data.branch))) &&
+                    ('createdByEmail' in request.resource.data) && request.resource.data.createdByEmail == request.auth.token.email &&
+                    ('createdByUid' in request.resource.data) && request.resource.data.createdByUid == request.auth.uid;
+      allow update: if isDoctor() && isValidCase(request.resource.data) && 
+                    (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(resource.data.branch))) &&
+                    (isSuperadmin() || (('createdByEmail' in resource.data) && resource.data.createdByEmail == request.auth.token.email)) &&
+                    (!('createdByEmail' in request.resource.data) || request.resource.data.createdByEmail == resource.data.createdByEmail) &&
+                    (!('createdByUid' in request.resource.data) || request.resource.data.createdByUid == resource.data.createdByUid);
       allow delete: if isSuperadmin();
     }
 
@@ -142,7 +166,20 @@ service cloud.firestore {
 
     match /todo/{todoId} {
       allow create: if true;
-      allow read, update, delete: if isDoctor();
+      allow read, update, delete: if isDoctor() && (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(resource.data.branch)));
+    }
+
+    match /branch_notes/{noteId} {
+      allow read: if isDoctor() && (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(resource.data.branch)));
+      allow create: if isDoctor() && isValidNote(request.resource.data) &&
+                    (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(request.resource.data.branch)));
+      allow delete: if isDoctor() && (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(resource.data.branch)));
+    }
+
+    match /tags/{tagId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isDoctor();
+      allow delete: if isSuperadmin();
     }
 
     match /test/connection {

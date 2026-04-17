@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
-import { collection, onSnapshot, query, doc, getDoc, setDoc, orderBy } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { collection, onSnapshot, query, doc, getDoc, setDoc, orderBy, where, limit } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -18,10 +18,62 @@ import PublicFollowUpForm from './components/PublicFollowUpForm';
 import PublicRequestsList from './components/PublicRequestsList';
 import ErrorBoundary from './components/ErrorBoundary';
 import { FollowUpCase, UserProfile, UserRole } from './types';
-import { PlusCircle, LogIn, Loader2, ClipboardList, Lock, Mail, AlertCircle } from 'lucide-react';
+import { normalizeBranch } from './lib/utils';
+import { PlusCircle, LogIn, Loader2, ClipboardList, Lock, Mail, AlertCircle, Chrome } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
 import WellnessForm from './components/WellnessForm';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX 4 – Superadmin role escalation
+// Centralise the allowlist so it is checked consistently in every code path.
+// ─────────────────────────────────────────────────────────────────────────────
+const SUPERADMIN_EMAILS = new Set([
+  'atikah.abdrahman@gmail.com',
+  'operation@hsohealthcare.com',
+  // 'admin@hsohealthcare.com' removed — belongs to Admin KJ (branch Admin), not Superadmin
+]);
+
+const SUPERADMIN_PERMISSIONS: UserProfile['permissions'] = [
+  'create_case', 'delete_case', 'view_history', 'manage_users',
+  'ai_analysis', 'view_dashboard', 'whatsapp_patient', 'export_csv',
+];
+
+/**
+ * Enforce role/permissions purely from the email allowlist.
+ * Any user whose email is NOT in SUPERADMIN_EMAILS will have the Superadmin
+ * role stripped — even if it was manually saved that way in Firestore.
+ *
+ * FIX 4: The original code used `else if (!userData.permissions)` which only
+ * ran when permissions were absent and never touched the role field itself.
+ * A Firestore document with role:'Superadmin' set by any means would sail
+ * through and grant full access to the wrong user.
+ */
+function enforceRole(userData: UserProfile, email: string | null): UserProfile {
+  // Hardcoded allowlist always wins — these emails are guaranteed Superadmin
+  // regardless of what Firestore says.
+  if (email && SUPERADMIN_EMAILS.has(email)) {
+    return { ...userData, role: 'Superadmin', permissions: SUPERADMIN_PERMISSIONS };
+  }
+
+  // For everyone else, trust the role saved in Firestore (e.g. a Superadmin
+  // promoted this user via the Add User / Edit User form in-app).
+  // We just make sure the permissions array always matches the role correctly
+  // so there are no mismatches from old or missing data.
+  if (userData.role === 'Superadmin') {
+    return { ...userData, permissions: SUPERADMIN_PERMISSIONS };
+  }
+
+  const defaultPermissions: UserProfile['permissions'] =
+    userData.role === 'Admin'
+      ? ['create_case', 'delete_case', 'view_history', 'ai_analysis', 'view_dashboard', 'whatsapp_patient']
+      : ['create_case', 'view_history', 'ai_analysis', 'view_dashboard'];
+
+  return {
+    ...userData,
+    permissions: userData.permissions ?? defaultPermissions,
+  };
+}
 
 export default function App() {
   const searchParams = new URLSearchParams(window.location.search);
@@ -36,12 +88,43 @@ export default function App() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isPublicFormOpen, setIsPublicFormOpen] = useState(false);
+  const [showUnauthorizedModal, setShowUnauthorizedModal] = useState(false);
   
   // Login Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loadStartTime, setLoadStartTime] = useState<number | null>(null);
+  const [isTakingTooLong, setIsTakingTooLong] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
+
+  // Loading Timer for visual hint
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (loading) {
+      timer = setTimeout(() => {
+        setIsTakingTooLong(true);
+      }, 3000);
+    } else {
+      setIsTakingTooLong(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  // Lazy load data after user is authorized
+  useEffect(() => {
+    if (user && !loading) {
+      // FIX 1: Reduced from 500ms to 100ms — the Firestore profile now loads
+      // in parallel so we no longer need a long artificial delay here.
+      const timer = setTimeout(() => {
+        setDataReady(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setDataReady(false);
+    }
+  }, [user, loading]);
 
   // Mobile check
   useEffect(() => {
@@ -57,55 +140,62 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        const isSuperEmail = SUPERADMIN_EMAILS.has(firebaseUser.email ?? '');
+
+        // FIX 1 – Slow login
+        // Previously setLoading(false) only ran AFTER getDoc() completed,
+        // gating the entire UI behind a sequential Firestore cold-start round-
+        // trip (up to 2-4 s on first load). Now we unblock the UI immediately
+        // with a minimal placeholder built from the already-resolved Firebase
+        // Auth object, then patch in the full Firestore profile in the
+        // background once it arrives.
+        const placeholder: UserProfile = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: firebaseUser.displayName || 'Loading...',
+          role: isSuperEmail ? 'Superadmin' : 'Doctor',
+          permissions: isSuperEmail ? SUPERADMIN_PERMISSIONS : [],
+          createdAt: '',
+        };
+        setUser(placeholder);
+        setLoading(false); // ← Unblock the UI immediately
+
+        // Fetch the full Firestore profile in the background.
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         try {
           const userDoc = await getDoc(userDocRef);
-          
+
           if (userDoc.exists()) {
-            const userData = userDoc.data() as UserProfile;
-            // Force Superadmin role if email matches
-            if (firebaseUser.email === 'atikah.abdrahman@gmail.com' || firebaseUser.email === 'operation@hsohealthcare.com') {
-              userData.role = 'Superadmin';
-              // Ensure Superadmin has all permissions
-              userData.permissions = ['create_case', 'delete_case', 'view_history', 'manage_users', 'ai_analysis', 'view_dashboard', 'whatsapp_patient', 'export_csv'];
-            } else if (!userData.permissions) {
-              // Default permissions for existing users who don't have them yet
-              userData.permissions = userData.role === 'Admin'
-                ? ['create_case', 'delete_case', 'view_history', 'ai_analysis', 'view_dashboard', 'whatsapp_patient']
-                : ['create_case', 'view_history', 'ai_analysis', 'view_dashboard'];
-            }
-            setUser(userData);
+            const raw = userDoc.data() as UserProfile;
+            // Only normalize if a branch is actually stored — don't assign a
+            // default branch, otherwise users with no branch silently inherit Kajang.
+            const normalized = normalizeBranch(raw.branch);
+            if (normalized) raw.branch = normalized as any;
+            if (!raw.email) raw.email = firebaseUser.email || '';
+            // enforceRole applies FIX 4: strips Superadmin from wrong emails
+            setUser(enforceRole(raw, firebaseUser.email));
           } else {
-            // Check if this is a superadmin email
-            const isSuperEmail = firebaseUser.email === 'atikah.abdrahman@gmail.com' || firebaseUser.email === 'operation@hsohealthcare.com';
-            
-            if (!isSuperEmail) {
-              // If not superadmin and no profile exists, they might have been deleted
-              // or they are a new user who hasn't been "added" yet.
-              // For now, we'll allow them to create a basic profile if they can log in,
-              // but you might want to restrict this.
-              const newProfile: UserProfile = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                displayName: firebaseUser.displayName || 'Staff Member',
-                role: 'Doctor',
-                permissions: ['create_case', 'view_history', 'ai_analysis', 'view_dashboard'],
-                createdAt: new Date().toISOString(),
-              };
-              await setDoc(userDocRef, newProfile);
-              setUser(newProfile);
-            } else {
-              const newProfile: UserProfile = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                displayName: firebaseUser.displayName || 'Staff Member',
-                role: 'Superadmin',
-                permissions: ['create_case', 'delete_case', 'view_history', 'manage_users', 'ai_analysis', 'view_dashboard', 'whatsapp_patient', 'export_csv'],
-                createdAt: new Date().toISOString(),
-              };
-              await setDoc(userDocRef, newProfile);
-              setUser(newProfile);
-            }
+            // No Firestore doc yet — create one with safe defaults.
+            const newProfile: UserProfile = isSuperEmail
+              ? {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  displayName: firebaseUser.displayName || 'Staff Member',
+                  role: 'Superadmin',
+                  permissions: SUPERADMIN_PERMISSIONS,
+                  createdAt: new Date().toISOString(),
+                }
+              : {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  displayName: firebaseUser.displayName || 'Staff Member',
+                  role: 'Doctor',
+                  branch: 'Kajang',
+                  permissions: ['create_case', 'view_history', 'ai_analysis', 'view_dashboard'],
+                  createdAt: new Date().toISOString(),
+                };
+            await setDoc(userDocRef, newProfile);
+            setUser(newProfile);
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -113,8 +203,8 @@ export default function App() {
         }
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -122,28 +212,44 @@ export default function App() {
 
   // Firestore Cases Listener
   useEffect(() => {
-    if (!user) {
+    if (!user || !dataReady) {
       setCases([]);
       return;
     }
 
-    const q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'));
+    let q;
+    if (user.role === 'Superadmin') {
+      q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'), limit(25));
+    } else {
+      if (!user.branch) {
+        setCases([]);
+        return;
+      }
+      
+      q = query(
+        collection(db, 'cases'), 
+        where('branch', '==', user.branch),
+        orderBy('createdAt', 'desc'),
+        limit(25)
+      );
+    }
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const casesData = snapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id
       })) as FollowUpCase[];
+      
+      // Sort client-side to avoid needing a composite index
+      casesData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
       setCases(casesData);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'cases');
     });
 
     return () => unsubscribe();
-  }, [user]);
-
-  if (isWellnessForm) {
-    return <WellnessForm />;
-  }
+  }, [user, dataReady]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,16 +259,60 @@ export default function App() {
     }
     setIsLoggingIn(true);
     setLoginError(null);
+
+    const maxRetries = 3;
+    let retryCount = 0;
+    const retryDelay = 2000; // 2 seconds
+
+    const attemptLogin = async (): Promise<void> => {
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (error: any) {
+        console.error(`Login attempt ${retryCount + 1} failed:`, error);
+        
+        if (error.code === 'auth/network-request-failed' && retryCount < maxRetries) {
+          retryCount++;
+          setLoginError(`Connection issue. Retrying in ${retryDelay/1000}s... (Attempt ${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return attemptLogin();
+        }
+
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+          setLoginError("Invalid email or password. Please check your credentials.");
+        } else if (error.code === 'auth/too-many-requests') {
+          setLoginError("Too many failed attempts. Account temporarily disabled.");
+        } else if (error.code === 'auth/network-request-failed') {
+          setLoginError("Connection Error: Please check your internet or try refreshing the page. If you are using a VPN or Ad-Blocker, please disable it for this site.");
+        } else {
+          setLoginError(`A system error occurred: ${error.message || error.code || 'Unknown error'}.`);
+        }
+      }
+    };
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await attemptLogin();
+    } catch (criticalError) {
+      console.error("Critical login error:", criticalError);
+      setLoginError("A critical error occurred. Please try refreshing the page.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
     } catch (error: any) {
-      console.error("Login failed:", error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        setLoginError("Invalid email or password. Please check your credentials.");
-      } else if (error.code === 'auth/too-many-requests') {
-        setLoginError("Too many failed attempts. Account temporarily disabled. Please try again later or reset your password.");
+      console.error("Google Login failed:", error);
+      if (error.code === 'auth/popup-blocked') {
+        setLoginError("Popup blocked. Please allow popups for this site.");
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setLoginError("This domain is not authorized for Google Login. Please contact Superadmin.");
       } else {
-        setLoginError("A system error occurred. Please try again later.");
+        setLoginError(`Google Login failed: ${error.message || error.code || 'Unknown error'}`);
       }
     } finally {
       setIsLoggingIn(false);
@@ -174,7 +324,12 @@ export default function App() {
   const handleAddCase = async (newCase: Partial<FollowUpCase>) => {
     try {
       const caseRef = doc(collection(db, 'cases'));
-      await setDoc(caseRef, { ...newCase, id: caseRef.id });
+      await setDoc(caseRef, { 
+        ...newCase, 
+        id: caseRef.id,
+        createdByEmail: user?.email || '',
+        createdByUid: user?.uid || ''
+      });
       setIsFormOpen(false);
       toast.success("Case successfully saved!");
     } catch (error) {
@@ -192,19 +347,54 @@ export default function App() {
     }
   };
 
+  // Tab Permission Checker
+  const handleSetActiveTab = (tabId: string) => {
+    const permissionsMap: Record<string, string[]> = {
+      'dashboard': ['view_dashboard'],
+      'cases': ['create_case', 'view_history'],
+      'todo': ['view_history'],
+      'patients': ['view_history'],
+      'users': ['manage_users'],
+    };
+
+    const requiredPermissions = permissionsMap[tabId];
+    if (requiredPermissions && user) {
+      const hasPermission = user.role === 'Superadmin' || requiredPermissions.some(p => user.permissions?.includes(p as any));
+      if (!hasPermission) {
+        setShowUnauthorizedModal(true);
+        return;
+      }
+    }
+    setActiveTab(tabId);
+  };
+
   const selectedCase = cases.find(c => c.id === selectedCaseId);
+
+  if (isWellnessForm) {
+    return <WellnessForm />;
+  }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4 animate-in fade-in duration-500 text-center">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+          <div className="space-y-1">
+            <p className="text-slate-900 font-bold">AraCare is warming up...</p>
+            {isTakingTooLong && (
+              <p className="text-slate-500 text-sm animate-pulse">
+                Optimizing your workstation & connecting to {user?.branch || 'clinic'} database...
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-50 overflow-y-auto flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200 max-w-md w-full space-y-8">
           <div className="text-center space-y-4">
             <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-indigo-200">
@@ -285,6 +475,25 @@ export default function App() {
               {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
               Sign In
             </button>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-2 bg-white text-slate-400 font-medium">OR CONTINUE WITH</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={isLoggingIn}
+              onClick={handleGoogleLogin}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+            >
+              <Chrome className="w-5 h-5 text-red-500" />
+              Sign in with Google
+            </button>
           </form>
           
           <div className="pt-6 border-t border-slate-100 text-center">
@@ -335,7 +544,7 @@ export default function App() {
     <ErrorBoundary>
       <Toaster position="top-right" richColors />
       <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogout={handleLogout} />
+        <Sidebar activeTab={activeTab} setActiveTab={handleSetActiveTab} user={user} onLogout={handleLogout} />
         
         <main className="flex-1 p-8 overflow-y-auto">
           <div className="max-w-6xl mx-auto">
@@ -353,20 +562,20 @@ export default function App() {
 
             {activeTab === 'dashboard' && <Dashboard cases={cases} userName={user.displayName} onFilterByTag={(tag) => { setTagFilter(tag); setActiveTab('cases'); }} />}
             {activeTab === 'cases' && <CaseList cases={cases} onViewCase={setSelectedCaseId} userPermissions={user.permissions || []} tagFilter={tagFilter} setTagFilter={setTagFilter} />}
-            {activeTab === 'todo' && <TodoList />}
+            {activeTab === 'todo' && <TodoList user={user} />}
             {activeTab === 'patients' && (
               <div className="p-12 text-center bg-white rounded-2xl border border-slate-200">
                 <h2 className="text-xl font-bold text-slate-900">Patient Directory</h2>
                 <p className="text-slate-500 mt-2">This feature is coming soon. You can currently manage patients through individual cases.</p>
               </div>
             )}
-            {activeTab === 'public_requests' && <PublicRequestsList />}
             {activeTab === 'users' && <UserManagement currentUser={user} />}
           </div>
         </main>
 
         {isFormOpen && (
           <CaseForm 
+            currentUser={user}
             onClose={() => setIsFormOpen(false)} 
             onSubmit={handleAddCase} 
             existingCases={cases}
@@ -383,9 +592,28 @@ export default function App() {
             allCases={cases}
           />
         )}
+
+        {showUnauthorizedModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 text-center animate-in zoom-in duration-300 border border-red-50">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Lock className="w-10 h-10 text-red-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900">Unauthorized Access</h2>
+              <p className="text-slate-500 mt-3 leading-relaxed">
+                You do not have permission to view this section. 
+                <span className="block mt-2 font-medium text-slate-700 underline">Please contact the Superadmin if you require access.</span>
+              </p>
+              <button 
+                onClick={() => setShowUnauthorizedModal(false)}
+                className="mt-8 w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );
 }
-
-

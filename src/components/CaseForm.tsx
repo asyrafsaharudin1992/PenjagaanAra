@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Loader2, AlertCircle } from 'lucide-react';
-import { FollowUpCase, FollowUpTag, ClinicBranch } from '../types';
+import { FollowUpCase, FollowUpTag, ClinicBranch, UserProfile } from '../types';
 import { suggestUrgency } from '../services/gemini';
-import { cn } from '../lib/utils';
+import { cn, normalizeBranch } from '../lib/utils';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 interface CaseFormProps {
   onClose: () => void;
   onSubmit: (newCase: Partial<FollowUpCase>) => void;
   existingCases: FollowUpCase[];
+  currentUser: UserProfile;
 }
 
-export default function CaseForm({ onClose, onSubmit, existingCases }: CaseFormProps) {
+export default function CaseForm({ onClose, onSubmit, existingCases, currentUser }: CaseFormProps) {
   const [formData, setFormData] = useState({
     patientId: '',
     patientName: '',
     patientPhone: '',
-    branch: 'Kajang' as ClinicBranch,
+    branch: normalizeBranch(currentUser.branch) as ClinicBranch,
     diagnosis: '',
     lastVisitDate: '',
     appointmentDate: '',
@@ -29,41 +32,78 @@ export default function CaseForm({ onClose, onSubmit, existingCases }: CaseFormP
   const [showHistory, setShowHistory] = useState(false);
   const [showNewTagInput, setShowNewTagInput] = useState(false);
   const [newTagValue, setNewTagValue] = useState('');
+  const [patientHistory, setPatientHistory] = useState<FollowUpCase[]>([]);
+  const [isSearchingHistory, setIsSearchingHistory] = useState(false);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
-  const defaultTags = ['AraMommy', 'AraHaji', 'AraWellness (weight loss)', 'Referral', 'others'];
-
-  const patientHistory = existingCases
-    .filter(c => c.patientId === formData.patientId)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // Fetch tags dynamically
+  useEffect(() => {
+    const q = query(collection(db, 'tags'), orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tags = snapshot.docs.map(doc => doc.data().name as string);
+      if (tags.length === 0) {
+        // Seed initial tags if empty (excluding AraHaji)
+        const initialTags = ['AraMommy', 'AraChronic', 'AraWellness (weight loss)', 'Referral', 'others'];
+        setAvailableTags(initialTags);
+      } else {
+        setAvailableTags(tags);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Check if patient is new when ID changes
   useEffect(() => {
-    if (!formData.patientId) {
-      setIsNewPatient(false);
-      return;
-    }
-    const exists = existingCases.some(c => c.patientId === formData.patientId);
-    setIsNewPatient(!exists);
-    
-    // If patient exists, try to find their name and phone to auto-fill
-    if (exists) {
-      const previousCase = existingCases.find(c => c.patientId === formData.patientId);
-      if (previousCase) {
-        setFormData(prev => ({
-          ...prev,
-          patientName: previousCase.patientName,
-          patientPhone: previousCase.patientPhone || ''
-        }));
+    const searchPatient = async () => {
+      if (!formData.patientId || formData.patientId.length < 3) {
+        setIsNewPatient(false);
+        setPatientHistory([]);
+        return;
       }
-    } else {
-      // If patient ID doesn't match any existing record, clear the auto-filled fields
-      setFormData(prev => ({
-        ...prev,
-        patientName: '',
-        patientPhone: ''
-      }));
-    }
-  }, [formData.patientId, existingCases]);
+
+      setIsSearchingHistory(true);
+      try {
+        const q = query(
+          collection(db, 'cases'),
+          where('patientId', '==', formData.patientId)
+        );
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+          const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FollowUpCase));
+          history.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          
+          setPatientHistory(history);
+          setIsNewPatient(false);
+          
+          // Auto-fill from the most recent case
+          const previousCase = history[0];
+          setFormData(prev => ({
+            ...prev,
+            patientName: previousCase.patientName || prev.patientName,
+            patientPhone: previousCase.patientPhone || prev.patientPhone
+          }));
+        } else {
+          setPatientHistory([]);
+          setIsNewPatient(true);
+          // If patient ID doesn't match any existing record, clear the auto-filled fields
+          setFormData(prev => ({
+            ...prev,
+            patientName: '',
+            patientPhone: ''
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching patient history:", error);
+      } finally {
+        setIsSearchingHistory(false);
+      }
+    };
+
+    // Debounce the search slightly
+    const timeoutId = setTimeout(searchPatient, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.patientId]);
 
   const handleSuggestUrgency = async () => {
     if (!formData.diagnosis) return;
@@ -73,8 +113,19 @@ export default function CaseForm({ onClose, onSubmit, existingCases }: CaseFormP
     setIsAnalyzing(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Ensure the tag is in the tags collection
+    if (formData.followUpTag && !availableTags.includes(formData.followUpTag)) {
+      try {
+        const tagRef = doc(collection(db, 'tags'), formData.followUpTag.toLowerCase().replace(/\s+/g, '_'));
+        await setDoc(tagRef, { name: formData.followUpTag });
+      } catch (error) {
+        console.error("Error saving new tag:", error);
+      }
+    }
+
     onSubmit({
       ...formData,
       createdAt: new Date().toISOString(),
@@ -149,7 +200,10 @@ export default function CaseForm({ onClose, onSubmit, existingCases }: CaseFormP
 
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient ID</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient ID</label>
+                {isSearchingHistory && <Loader2 className="w-3 h-3 animate-spin text-indigo-500" />}
+              </div>
               <input 
                 required
                 type="text"
@@ -199,8 +253,9 @@ export default function CaseForm({ onClose, onSubmit, existingCases }: CaseFormP
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Clinic Branch</label>
               <select 
                 value={formData.branch}
-                onChange={e => setFormData({...formData, branch: e.target.value as any})}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                disabled={currentUser.role !== 'Superadmin'}
+                onChange={e => setFormData({...formData, branch: normalizeBranch(e.target.value) as any})}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-50"
               >
                 <option value="Kajang">Kajang</option>
                 <option value="Seri Kembangan">Seri Kembangan</option>
@@ -220,10 +275,10 @@ export default function CaseForm({ onClose, onSubmit, existingCases }: CaseFormP
                   }}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 >
-                  {defaultTags.map(tag => (
+                  {availableTags.map(tag => (
                     <option key={tag} value={tag}>{tag}</option>
                   ))}
-                  {!defaultTags.includes(formData.followUpTag) && formData.followUpTag && (
+                  {!availableTags.includes(formData.followUpTag) && formData.followUpTag && (
                     <option value={formData.followUpTag}>{formData.followUpTag}</option>
                   )}
                   <option value="CREATE_NEW" className="font-bold text-indigo-600">+ Create New Tag...</option>

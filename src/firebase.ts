@@ -5,14 +5,57 @@ import {
   signOut, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence
 } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, query, where, addDoc, updateDoc, deleteDoc, getDocFromServer } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  onSnapshot, 
+  query, 
+  where, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDocFromServer,
+  enableMultiTabIndexedDbPersistence,
+  limit
+} from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+
+// Explicitly check configuration
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error("Firebase Configuration is missing critical fields. Please check your setup.");
+}
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// Set persistence explicitly to browserLocalPersistence
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error("Auth persistence error:", error);
+});
+
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Enable Offline Persistence for Firestore
+if (typeof window !== 'undefined') {
+  enableMultiTabIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      // Multiple tabs open, persistence can only be enabled in one tab at a time.
+      console.warn("Firestore persistence failed-precondition: Multiple tabs open.");
+    } else if (err.code === 'unimplemented') {
+      // The current browser does not support all of the features required to enable persistence
+      console.warn("Firestore persistence unimplemented: Browser not supported.");
+    } else {
+      console.error("Firestore persistence error:", err);
+    }
+  });
+}
 
 // For creating users without logging out
 const secondaryApp = initializeApp(firebaseConfig, 'Secondary');

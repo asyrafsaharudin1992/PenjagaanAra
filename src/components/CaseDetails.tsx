@@ -18,7 +18,7 @@ import { FollowUpCase, FollowUpTag, UserRole, UserPermission, ClinicBranch } fro
 import { summarizeCase } from '../services/gemini';
 import { cn } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { deleteDoc, doc, collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { deleteDoc, doc, collection, query, where, onSnapshot, orderBy, getDocs, setDoc } from 'firebase/firestore';
 
 interface WellnessUpdate {
   id: string;
@@ -57,9 +57,26 @@ export default function CaseDetails({
   const [editedTag, setEditedTag] = useState(caseData.followUpTag);
   const [editedBranch, setEditedBranch] = useState(caseData.branch || 'Kajang');
   const [editedDoctorInCharge, setEditedDoctorInCharge] = useState(caseData.doctorInCharge || '');
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+
+  // Fetch tags dynamically
+  useEffect(() => {
+    const q = query(collection(db, 'tags'), orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tags = snapshot.docs.map(doc => doc.data().name as string);
+      if (tags.length === 0) {
+        // Seed initial tags if empty (excluding AraHaji)
+        const initialTags = ['AraMommy', 'AraChronic', 'AraWellness (weight loss)', 'Referral', 'others'];
+        setAvailableTags(initialTags);
+      } else {
+        setAvailableTags(tags);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
-    if (!caseData.followUpTag.toLowerCase().includes('arawellness')) return;
+    if (!(caseData.followUpTag || '').toLowerCase().includes('arawellness')) return;
 
     const q = query(
       collection(db, 'wellness_updates'),
@@ -106,9 +123,35 @@ export default function CaseDetails({
     return `https://wa.me/${formatted}`;
   };
 
-  const patientHistory = allCases
-    .filter(c => c.patientId === caseData.patientId && c.id !== caseData.id)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const [patientHistory, setPatientHistory] = useState<FollowUpCase[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (!caseData.patientId) return;
+
+    const fetchHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const q = query(
+          collection(db, 'cases'),
+          where('patientId', '==', caseData.patientId)
+        );
+        const snapshot = await getDocs(q);
+        const history = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as FollowUpCase))
+          .filter(c => c.id !== caseData.id)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        setPatientHistory(history);
+      } catch (error) {
+        console.error("Error fetching patient history:", error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
+  }, [caseData.patientId, caseData.id]);
 
   const handleSummarize = async () => {
     setIsSummarizing(true);
@@ -124,6 +167,12 @@ export default function CaseDetails({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Ensure the tag is in the tags collection if it's new
+      if (editedTag && !availableTags.includes(editedTag)) {
+        const tagRef = doc(collection(db, 'tags'), editedTag.toLowerCase().replace(/\s+/g, '_'));
+        await setDoc(tagRef, { name: editedTag });
+      }
+
       const updates: Partial<FollowUpCase> = {
         followUpTag: editedTag,
         remarks: editedRemarks,
@@ -274,7 +323,7 @@ export default function CaseDetails({
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Update Follow Up Tag</label>
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
-                {defaultTags.map((s) => (
+                {availableTags.map((s) => (
                   <button
                     key={s}
                     onClick={() => handleStatusChange(s)}
@@ -289,7 +338,7 @@ export default function CaseDetails({
                     {s}
                   </button>
                 ))}
-                {!defaultTags.includes(caseData.followUpTag) && (
+                {!availableTags.includes(caseData.followUpTag) && (
                   <button
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-[10px] font-bold border bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 uppercase tracking-wider",
@@ -299,7 +348,7 @@ export default function CaseDetails({
                     {caseData.followUpTag}
                   </button>
                 )}
-                {editedTag && !defaultTags.includes(editedTag) && editedTag !== caseData.followUpTag && (
+                {editedTag && !availableTags.includes(editedTag) && editedTag !== caseData.followUpTag && (
                   <button
                     className="px-3 py-1.5 rounded-lg text-[10px] font-bold border bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 uppercase tracking-wider ring-2 ring-indigo-500 ring-offset-2"
                   >
@@ -421,35 +470,38 @@ export default function CaseDetails({
             </div>
 
             {/* Patient History Section */}
-            {canViewHistory && patientHistory.length > 0 && (
+            {canViewHistory && (patientHistory.length > 0 || isLoadingHistory) && (
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5" />
-                  Past Follow-up History ({patientHistory.length})
+                  Past Follow-up History {isLoadingHistory ? '' : `(${patientHistory.length})`}
+                  {isLoadingHistory && <Loader2 className="w-3 h-3 animate-spin ml-2" />}
                 </label>
-                <div className="space-y-3">
-                  {patientHistory.map((pastCase, idx) => (
-                    <div key={idx} className="bg-slate-50/50 border border-slate-100 p-4 rounded-xl space-y-2">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          {new Date(pastCase.createdAt).toLocaleDateString()}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full uppercase tracking-wider">
-                          {pastCase.followUpTag}
-                        </span>
+                {!isLoadingHistory && (
+                  <div className="space-y-3">
+                    {patientHistory.map((pastCase, idx) => (
+                      <div key={idx} className="bg-slate-50/50 border border-slate-100 p-4 rounded-xl space-y-2">
+                        <div className="flex justify-between items-start">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            {new Date(pastCase.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full uppercase tracking-wider">
+                            {pastCase.followUpTag}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-slate-800">{pastCase.diagnosis}</p>
+                        {pastCase.remarks && (
+                          <p className="text-xs text-slate-500 italic">"{pastCase.remarks}"</p>
+                        )}
                       </div>
-                      <p className="text-sm font-medium text-slate-800">{pastCase.diagnosis}</p>
-                      {pastCase.remarks && (
-                        <p className="text-xs text-slate-500 italic">"{pastCase.remarks}"</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Wellness Updates Section */}
-            {caseData.followUpTag.toLowerCase() === 'arawellness (weight loss)' && wellnessUpdates.length > 0 && (
+            {(caseData.followUpTag || '').toLowerCase() === 'arawellness (weight loss)' && wellnessUpdates.length > 0 && (
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <label className="text-xs font-semibold text-emerald-600 uppercase tracking-wider flex items-center gap-2">
                   <Activity className="w-4 h-4" />

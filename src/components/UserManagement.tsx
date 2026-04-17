@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, setDoc, query, collection, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, secondaryAuth, auth, createUserWithEmailAndPassword, sendPasswordResetEmail } from '../firebase';
 import { UserProfile, UserRole, UserPermission } from '../types';
+import { normalizeBranch } from '../lib/utils';
 import { 
   User, 
   Mail, 
@@ -56,7 +57,8 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
     email: '',
     password: '',
     displayName: '',
-    role: 'Doctor' as UserRole
+    role: 'Doctor' as UserRole,
+    branch: 'Kajang' as any
   });
 
   const isSuperadmin = currentUser.role === 'Superadmin';
@@ -150,6 +152,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         displayName: editingUser.displayName,
         email: editingUser.email,
         role: editingUser.role,
+        branch: normalizeBranch(editingUser.branch) as any,
         permissions: editingUser.permissions
       });
       setIsEditModalOpen(false);
@@ -186,6 +189,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         email: newUser.email,
         displayName: newUser.displayName,
         role: newUser.role,
+        branch: normalizeBranch(newUser.branch) as any,
         permissions: defaultPermissions,
         createdAt: new Date().toISOString()
       };
@@ -194,7 +198,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
       
       // 3. Success!
       setIsAddModalOpen(false);
-      setNewUser({ email: '', password: '', displayName: '', role: 'Doctor' });
+      setNewUser({ email: '', password: '', displayName: '', role: 'Doctor', branch: 'Kajang' });
     } catch (error: any) {
       console.error("Error adding user:", error);
       setAddError(error.message || "Failed to create user account.");
@@ -310,6 +314,11 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                     )}>
                       {u.role}
                     </span>
+                    {u.branch && (
+                      <span className="ml-2 text-[10px] font-bold px-2.5 py-1 rounded-md border bg-blue-50 text-blue-700 border-blue-100 uppercase tracking-wider inline-block">
+                        {u.branch}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500">
                     {new Date(u.createdAt).toLocaleDateString()}
@@ -401,17 +410,31 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</label>
-                <select 
-                  value={editingUser.role}
-                  onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  <option value="Doctor">Doctor</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Superadmin">Superadmin</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</label>
+                  <select 
+                    value={editingUser.role}
+                    onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="Doctor">Doctor</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Superadmin">Superadmin</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</label>
+                  <select 
+                    value={editingUser.branch || 'Kajang'}
+                    onChange={e => setEditingUser({...editingUser, branch: e.target.value as any})}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="Kajang">Kajang</option>
+                    <option value="Seri Kembangan">Seri Kembangan</option>
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -528,18 +551,31 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Initial Role</label>
-                <select 
-                  value={newUser.role}
-                  onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  <option value="Doctor">Doctor</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Superadmin">Superadmin</option>
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1 italic">Permissions can be adjusted after creation.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Initial Role</label>
+                  <select 
+                    value={newUser.role}
+                    onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="Doctor">Doctor</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Superadmin">Superadmin</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Branch</label>
+                  <select 
+                    value={newUser.branch}
+                    onChange={e => setNewUser({...newUser, branch: e.target.value as any})}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="Kajang">Kajang</option>
+                    <option value="Seri Kembangan">Seri Kembangan</option>
+                  </select>
+                </div>
               </div>
 
               {addError && (

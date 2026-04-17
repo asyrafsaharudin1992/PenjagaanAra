@@ -15,6 +15,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   role: UserRole;
+  branch?: ClinicBranch;
   permissions: UserPermission[];
   createdAt: string;
 }
@@ -47,6 +48,8 @@ export interface FollowUpCase {
   patientPhone?: string;
   isNotesCopied?: boolean;
   createdAt: string;
+  createdByEmail?: string;
+  createdByUid?: string;
 }
 
 export interface DashboardStats {
