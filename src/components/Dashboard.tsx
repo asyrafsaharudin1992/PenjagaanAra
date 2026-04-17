@@ -256,7 +256,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} onClick={(d) => d?.activePayload && onFilterByTag(d.activePayload[0]?.payload?.name)}>
+                <BarChart data={chartData} onClick={(d: any) => d?.activePayload && onFilterByTag(d.activePayload[0]?.payload?.name)}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
                     dataKey="name" 

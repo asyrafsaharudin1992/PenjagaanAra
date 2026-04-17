@@ -152,7 +152,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         displayName: editingUser.displayName,
         email: editingUser.email,
         role: editingUser.role,
-        branch: normalizeBranch(editingUser.branch) as any,
+        branch: (normalizeBranch(editingUser.branch) || 'Kajang') as any,
         permissions: editingUser.permissions
       });
       setIsEditModalOpen(false);
@@ -189,7 +189,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         email: newUser.email,
         displayName: newUser.displayName,
         role: newUser.role,
-        branch: normalizeBranch(newUser.branch) as any,
+        branch: (normalizeBranch(newUser.branch) || 'Kajang') as any,
         permissions: defaultPermissions,
         createdAt: new Date().toISOString()
       };

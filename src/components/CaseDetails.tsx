@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Trash2,
   MessageCircle,
-  Activity
+  Activity,
+  Baby,
+  Stethoscope
 } from 'lucide-react';
 import { FollowUpCase, FollowUpTag, UserRole, UserPermission, ClinicBranch } from '../types';
 import { summarizeCase } from '../services/gemini';
@@ -35,6 +37,47 @@ interface CaseDetailsProps {
   userPermissions: UserPermission[];
   allCases: FollowUpCase[];
 }
+
+// --- ADDED: ANC and NCD field types ---
+interface ANCFields {
+  gaWeeks: string;
+  supplementGiven: string;
+  compliance: string;
+  riskCategory: string;
+}
+
+interface NCDFields {
+  lastBloodTest: string;
+  nextBloodTestDue: string;
+  medication: string;
+  refillStatus: string;
+  compliance: string;
+}
+
+const defaultANCFields: ANCFields = {
+  gaWeeks: '',
+  supplementGiven: '',
+  compliance: '',
+  riskCategory: '',
+};
+
+const defaultNCDFields: NCDFields = {
+  lastBloodTest: '',
+  nextBloodTestDue: '',
+  medication: '',
+  refillStatus: '',
+  compliance: '',
+};
+
+function parseRegistryData(raw: any): { type: string } & (ANCFields | NCDFields) | null {
+  if (!raw) return null;
+  try {
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (data && data.type) return data;
+  } catch {}
+  return null;
+}
+// --- END ADDED ---
 
 export default function CaseDetails({ 
   caseData, 
@@ -59,13 +102,17 @@ export default function CaseDetails({
   const [editedDoctorInCharge, setEditedDoctorInCharge] = useState(caseData.doctorInCharge || '');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
+  // --- ADDED: ANC and NCD field state ---
+  const [ancFields, setAncFields] = useState<ANCFields>(defaultANCFields);
+  const [ncdFields, setNcdFields] = useState<NCDFields>(defaultNCDFields);
+  // --- END ADDED ---
+
   // Fetch tags dynamically
   useEffect(() => {
     const q = query(collection(db, 'tags'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const tags = snapshot.docs.map(doc => doc.data().name as string);
       if (tags.length === 0) {
-        // Seed initial tags if empty (excluding AraHaji)
         const initialTags = ['AraMommy', 'AraChronic', 'AraWellness (weight loss)', 'Referral', 'others'];
         setAvailableTags(initialTags);
       } else {
@@ -74,6 +121,36 @@ export default function CaseDetails({
     });
     return () => unsubscribe();
   }, []);
+
+  // --- ADDED: Load registry data when case loads ---
+  useEffect(() => {
+    const raw = (caseData as any).registryData;
+    const parsed = parseRegistryData(raw);
+    if (parsed) {
+      if (parsed.type === 'ANC') {
+        const anc = parsed as ANCFields;
+        setAncFields({
+          gaWeeks: anc.gaWeeks || '',
+          supplementGiven: anc.supplementGiven || '',
+          compliance: anc.compliance || '',
+          riskCategory: anc.riskCategory || '',
+        });
+      } else if (parsed.type === 'NCD') {
+        const ncd = parsed as NCDFields;
+        setNcdFields({
+          lastBloodTest: ncd.lastBloodTest || '',
+          nextBloodTestDue: ncd.nextBloodTestDue || '',
+          medication: ncd.medication || '',
+          refillStatus: ncd.refillStatus || '',
+          compliance: ncd.compliance || '',
+        });
+      }
+    } else {
+      setAncFields(defaultANCFields);
+      setNcdFields(defaultNCDFields);
+    }
+  }, [caseData.id]);
+  // --- END ADDED ---
 
   useEffect(() => {
     if (!(caseData.followUpTag || '').toLowerCase().includes('arawellness')) return;
@@ -89,10 +166,8 @@ export default function CaseDetails({
         ...doc.data()
       })) as WellnessUpdate[];
       
-      // Sort client side since we might not have a composite index
       updates.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
-      // Group by date and keep only the latest for each date (handles legacy data)
       const uniqueUpdates: WellnessUpdate[] = [];
       const seenDates = new Set();
       for (const update of updates) {
@@ -167,7 +242,6 @@ export default function CaseDetails({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Ensure the tag is in the tags collection if it's new
       if (editedTag && !availableTags.includes(editedTag)) {
         const tagRef = doc(collection(db, 'tags'), editedTag.toLowerCase().replace(/\s+/g, '_'));
         await setDoc(tagRef, { name: editedTag });
@@ -184,6 +258,17 @@ export default function CaseDetails({
       if (editedRemarks !== caseData.remarks) {
         updates.isNotesCopied = false;
       }
+
+      // --- ADDED: Save registry data based on tag ---
+      const tagLower = (editedTag || '').toLowerCase();
+      if (tagLower === 'aramommy') {
+        (updates as any).registryData = JSON.stringify({ type: 'ANC', ...ancFields });
+      } else if (tagLower === 'arachronic') {
+        (updates as any).registryData = JSON.stringify({ type: 'NCD', ...ncdFields });
+      } else {
+        (updates as any).registryData = null;
+      }
+      // --- END ADDED ---
 
       await onUpdate(caseData.id, updates);
       onClose();
@@ -206,6 +291,49 @@ export default function CaseDetails({
       setShowDeleteConfirm(false);
     }
   };
+
+  // --- ADDED: Determine which registry section to show ---
+  const tagLower = (editedTag || '').toLowerCase();
+  const showANC = tagLower === 'aramommy';
+  const showNCD = tagLower === 'arachronic';
+  // --- END ADDED ---
+
+  // --- ADDED: Pill button component for selectable options ---
+  const PillSelect = ({ options, value, onChange, colorScheme }: {
+    options: string[];
+    value: string;
+    onChange: (val: string) => void;
+    colorScheme: 'rose' | 'teal';
+  }) => {
+    const colors = colorScheme === 'rose'
+      ? {
+          active: 'bg-rose-100 text-rose-700 border-rose-300',
+          inactive: 'bg-white text-slate-500 border-slate-200 hover:border-rose-200 hover:text-rose-600',
+        }
+      : {
+          active: 'bg-teal-100 text-teal-700 border-teal-300',
+          inactive: 'bg-white text-slate-500 border-slate-200 hover:border-teal-200 hover:text-teal-600',
+        };
+
+    return (
+      <div className="flex gap-1.5 flex-wrap">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(value === opt ? '' : opt)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all uppercase tracking-wider",
+              value === opt ? colors.active : colors.inactive
+            )}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    );
+  };
+  // --- END ADDED ---
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-end z-50">
@@ -451,6 +579,128 @@ export default function CaseDetails({
                 <MessageSquare className="w-3.5 h-3.5" />
                 Remarks
               </label>
+
+              {/* --- ADDED: ANC Registry Fields (AraMommy) --- */}
+              {showANC && (
+                <div className="bg-rose-50/60 border border-rose-200/70 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-rose-100 flex items-center justify-center">
+                      <Baby className="w-3.5 h-3.5 text-rose-600" />
+                    </div>
+                    <p className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">ANC Registry Fields</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-semibold text-rose-600/80 uppercase tracking-wider">GA (weeks)</p>
+                      <input
+                        type="text"
+                        value={ancFields.gaWeeks}
+                        onChange={(e) => setAncFields({ ...ancFields, gaWeeks: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400"
+                        placeholder="e.g. 32"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-semibold text-rose-600/80 uppercase tracking-wider">Supplement Given</p>
+                      <input
+                        type="text"
+                        value={ancFields.supplementGiven}
+                        onChange={(e) => setAncFields({ ...ancFields, supplementGiven: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400"
+                        placeholder="e.g. FA + Calcium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-rose-600/80 uppercase tracking-wider">Risk Category</p>
+                    <PillSelect
+                      options={['Low', 'Moderate', 'High']}
+                      value={ancFields.riskCategory}
+                      onChange={(val) => setAncFields({ ...ancFields, riskCategory: val })}
+                      colorScheme="rose"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-rose-600/80 uppercase tracking-wider">Compliance</p>
+                    <PillSelect
+                      options={['Y', 'N']}
+                      value={ancFields.compliance}
+                      onChange={(val) => setAncFields({ ...ancFields, compliance: val })}
+                      colorScheme="rose"
+                    />
+                  </div>
+                </div>
+              )}
+              {/* --- END ADDED --- */}
+
+              {/* --- ADDED: NCD Registry Fields (AraChronic) --- */}
+              {showNCD && (
+                <div className="bg-teal-50/60 border border-teal-200/70 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-teal-100 flex items-center justify-center">
+                      <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
+                    </div>
+                    <p className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">NCD Registry Fields</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Last Blood Test</p>
+                      <input
+                        type="date"
+                        value={ncdFields.lastBloodTest}
+                        onChange={(e) => setNcdFields({ ...ncdFields, lastBloodTest: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-teal-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Next Blood Test Due</p>
+                      <input
+                        type="date"
+                        value={ncdFields.nextBloodTestDue}
+                        onChange={(e) => setNcdFields({ ...ncdFields, nextBloodTestDue: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-teal-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Medication</p>
+                    <input
+                      type="text"
+                      value={ncdFields.medication}
+                      onChange={(e) => setNcdFields({ ...ncdFields, medication: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-teal-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+                      placeholder="e.g. Metformin 500mg BD"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Refill Status</p>
+                    <PillSelect
+                      options={['Done', 'Pending', 'Overdue']}
+                      value={ncdFields.refillStatus}
+                      onChange={(val) => setNcdFields({ ...ncdFields, refillStatus: val })}
+                      colorScheme="teal"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Compliance</p>
+                    <PillSelect
+                      options={['Y', 'N']}
+                      value={ncdFields.compliance}
+                      onChange={(val) => setNcdFields({ ...ncdFields, compliance: val })}
+                      colorScheme="teal"
+                    />
+                  </div>
+                </div>
+              )}
+              {/* --- END ADDED --- */}
+
               <textarea 
                 value={editedRemarks}
                 onChange={(e) => setEditedRemarks(e.target.value)}
@@ -547,4 +797,3 @@ export default function CaseDetails({
     </div>
   );
 }
-
