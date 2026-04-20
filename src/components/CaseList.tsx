@@ -13,24 +13,27 @@ import {
   X,
   MessageCircle,
   Upload,
-  Copy
+  Copy,
+  Undo2,
+  Check
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { FollowUpCase, FollowUpTag, UserPermission } from '../types';
+import { FollowUpCase, FollowUpTag, UserPermission, UserProfile, Patient } from '../types';
 import { cn } from '../lib/utils';
-import { db } from '../firebase';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 
 interface CaseListProps {
   cases: FollowUpCase[];
   onViewCase: (caseId: string) => void;
-  userPermissions: UserPermission[];
-  userRole?: string;
+  currentUser: UserProfile;
   tagFilter: string | null;
   setTagFilter: (tag: string | null) => void;
 }
 
-export default function CaseList({ cases, onViewCase, userPermissions, userRole, tagFilter, setTagFilter }: CaseListProps) {
+export default function CaseList({ cases, onViewCase, currentUser, tagFilter, setTagFilter }: CaseListProps) {
+  const userPermissions = currentUser.permissions || [];
+  const userRole = currentUser.role;
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FollowUpTag | 'All'>(tagFilter ? (tagFilter as FollowUpTag) : 'All');
   const [branchFilter, setBranchFilter] = useState<string>('All');
@@ -64,6 +67,17 @@ export default function CaseList({ cases, onViewCase, userPermissions, userRole,
     title?: string;
     instruction?: string;
   }>({ isOpen: false, caseData: null, text: '', isLoading: false });
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    caseData: FollowUpCase | null;
+    isProcessing: boolean;
+  }>({
+    isOpen: false,
+    caseData: null,
+    isProcessing: false
+  });
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +108,44 @@ export default function CaseList({ cases, onViewCase, userPermissions, userRole,
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const executeReturn = async () => {
+    if (!confirmModal.caseData) return;
+    const c = confirmModal.caseData;
+    
+    setConfirmModal(prev => ({ ...prev, isProcessing: true }));
+    try {
+      const patientRef = doc(collection(db, 'patients'));
+      const patientData: Patient = {
+        id: patientRef.id,
+        patientId: c.patientId || `P-${Date.now()}`,
+        name: c.patientName,
+        phone: c.patientPhone || '',
+        branch: c.branch,
+        tag: c.followUpTag || 'General',
+        createdAt: new Date().toISOString(),
+        createdByEmail: currentUser.email || 'system',
+        createdByUid: currentUser.uid || 'system',
+      };
+
+      // 1. Create the patient in directory
+      await setDoc(patientRef, patientData);
+
+      // 2. Delete from cases collection
+      await deleteDoc(doc(db, 'cases', c.id));
+
+      toast.success(`${c.patientName} moved back to Patient Directory.`);
+      setConfirmModal({ isOpen: false, caseData: null, isProcessing: false });
+    } catch (error: any) {
+      console.error("Error returning patient:", error);
+      try {
+        handleFirestoreError(error, OperationType.WRITE, `patients/cases - returning ${c.patientName}`);
+      } catch (uiError: any) {
+        toast.error(uiError.message);
+      }
+      setConfirmModal(prev => ({ ...prev, isProcessing: false }));
+    }
   };
 
   const filteredCases = cases.filter(c => {
@@ -489,6 +541,29 @@ export default function CaseList({ cases, onViewCase, userPermissions, userRole,
                           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
                         </div>
                       </div>
+
+                      {['Superadmin', 'Admin'].includes(userRole || '') && (
+                        <div className="relative group/btn flex items-center justify-center">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmModal({
+                                isOpen: true,
+                                caseData: c,
+                                isProcessing: false
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 transition-colors font-bold text-[10px] uppercase tracking-wider"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />
+                            Return
+                          </button>
+                          <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
+                            Return to Directory
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -604,6 +679,43 @@ export default function CaseList({ cases, onViewCase, userPermissions, userRole,
               >
                 CLOSE HISTORY
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return to Directory Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Undo2 className="w-8 h-8 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Return to Directory?</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Ini akan memindahkan pesakit <b>{confirmModal.caseData?.patientName}</b> kembali ke Tab Patients. Rekod follow-up semasa akan dipadamkan.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmModal({ isOpen: false, caseData: null, isProcessing: false })}
+                  disabled={confirmModal.isProcessing}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeReturn}
+                  disabled={confirmModal.isProcessing}
+                  className="flex-1 px-4 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {confirmModal.isProcessing ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : <Check className="w-4 h-4" />}
+                  Yes, Return
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -14,13 +14,16 @@ import {
   MessageCircle,
   Activity,
   Baby,
-  Stethoscope
+  Stethoscope,
+  Undo2,
+  Check
 } from 'lucide-react';
-import { FollowUpCase, FollowUpTag, UserRole, UserPermission, ClinicBranch } from '../types';
+import { FollowUpCase, FollowUpTag, UserRole, UserPermission, ClinicBranch, Patient, UserProfile } from '../types';
 import { summarizeCase } from '../services/gemini';
 import { cn } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { deleteDoc, doc, collection, query, where, onSnapshot, orderBy, getDocs, setDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 interface WellnessUpdate {
   id: string;
@@ -33,8 +36,7 @@ interface CaseDetailsProps {
   caseData: FollowUpCase;
   onClose: () => void;
   onUpdate: (caseId: string, updates: Partial<FollowUpCase>) => void;
-  userRole: UserRole;
-  userPermissions: UserPermission[];
+  currentUser: UserProfile;
   allCases: FollowUpCase[];
 }
 
@@ -83,13 +85,18 @@ export default function CaseDetails({
   caseData, 
   onClose, 
   onUpdate, 
-  userRole, 
-  userPermissions,
+  currentUser,
   allCases 
 }: CaseDetailsProps) {
+  const userRole = currentUser.role;
+  const userPermissions = currentUser.permissions || [];
+  const currentUserEmail = currentUser.email;
+  const currentUserUid = currentUser.uid;
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
+  const [showReturnConfirm, setShowReturnConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showNewTagInput, setShowNewTagInput] = useState(false);
   const [newTagValue, setNewTagValue] = useState('');
@@ -228,6 +235,43 @@ export default function CaseDetails({
     fetchHistory();
   }, [caseData.patientId, caseData.id]);
 
+  const handleReturn = async () => {
+    setIsReturning(true);
+    try {
+      const patientRef = doc(collection(db, 'patients'));
+      const patientData: Patient = {
+        id: patientRef.id,
+        patientId: caseData.patientId || `P-${Date.now()}`,
+        name: caseData.patientName,
+        phone: caseData.patientPhone || '',
+        branch: caseData.branch,
+        tag: caseData.followUpTag || 'General',
+        createdAt: new Date().toISOString(),
+        createdByEmail: currentUserEmail || 'system',
+        createdByUid: currentUserUid || 'system',
+      };
+
+      // 1. Create the patient in directory
+      await setDoc(patientRef, patientData);
+
+      // 2. Delete from cases collection
+      await deleteDoc(doc(db, 'cases', caseData.id));
+
+      toast.success(`${caseData.patientName} moved back to Patient Directory.`);
+      onClose();
+    } catch (error: any) {
+      console.error("Error returning patient:", error);
+      try {
+        handleFirestoreError(error, OperationType.WRITE, `patients/cases - returning ${caseData.patientName}`);
+      } catch (uiError: any) {
+        toast.error(uiError.message);
+      }
+    } finally {
+      setIsReturning(false);
+      setShowReturnConfirm(false);
+    }
+  };
+
   const handleSummarize = async () => {
     setIsSummarizing(true);
     const summary = await summarizeCase(caseData.diagnosis, [caseData.remarks]);
@@ -365,35 +409,69 @@ export default function CaseDetails({
           </div>
           <div className="flex items-center gap-2">
             {canDelete && (
-              <div className="relative">
-                <button 
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={isDeleting}
-                  className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                  title="Delete Case"
-                >
-                  {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                </button>
-                
-                {showDeleteConfirm && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-20 animate-in fade-in slide-in-from-top-2">
-                    <p className="text-xs font-bold text-slate-900 mb-3">Delete this case?</p>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => setShowDeleteConfirm(false)}
-                        className="flex-1 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-200"
-                      >
-                        CANCEL
-                      </button>
-                      <button 
-                        onClick={handleDelete}
-                        className="flex-1 py-1.5 bg-red-600 text-white rounded-lg text-[10px] font-bold hover:bg-red-700"
-                      >
-                        DELETE
-                      </button>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <button 
+                    disabled={isReturning}
+                    onClick={() => setShowReturnConfirm(!showReturnConfirm)}
+                    className="p-2 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-colors"
+                    title="Return to Patient Directory"
+                  >
+                    {isReturning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Undo2 className="w-5 h-5" />}
+                  </button>
+                  
+                  {showReturnConfirm && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 animate-in fade-in slide-in-from-top-2">
+                      <p className="text-xs font-bold text-slate-900 mb-3">Return to Patients?</p>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setShowReturnConfirm(false)}
+                          className="flex-1 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-200"
+                        >
+                          CANCEL
+                        </button>
+                        <button 
+                          onClick={handleReturn}
+                          disabled={isReturning}
+                          className="flex-1 py-1.5 bg-amber-600 text-white rounded-lg text-[10px] font-bold hover:bg-amber-700 flex items-center justify-center gap-2"
+                        >
+                          RETURN
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isDeleting}
+                    className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                    title="Delete Case"
+                  >
+                    {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                  </button>
+                  
+                  {showDeleteConfirm && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-20 animate-in fade-in slide-in-from-top-2">
+                      <p className="text-xs font-bold text-slate-900 mb-3">Delete this case?</p>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="flex-1 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-200"
+                        >
+                          CANCEL
+                        </button>
+                        <button 
+                          onClick={handleDelete}
+                          className="flex-1 py-1.5 bg-red-600 text-white rounded-lg text-[10px] font-bold hover:bg-red-700"
+                        >
+                          DELETE
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">

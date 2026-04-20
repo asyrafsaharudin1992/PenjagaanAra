@@ -596,7 +596,7 @@ export default function App() {
             </div>
 
             {activeTab === 'dashboard' && <Dashboard cases={cases} userName={user.displayName} onFilterByTag={(tag) => { setTagFilter(tag); setActiveTab('cases'); }} />}
-            {activeTab === 'cases' && <CaseList cases={cases} onViewCase={setSelectedCaseId} userPermissions={user.permissions || []} userRole={user.role} tagFilter={tagFilter} setTagFilter={setTagFilter} />}
+            {activeTab === 'cases' && user && <CaseList cases={cases} onViewCase={setSelectedCaseId} currentUser={user} tagFilter={tagFilter} setTagFilter={setTagFilter} />}
             {activeTab === 'todo' && <TodoList user={user} />}
             {activeTab === 'patients' && (
               <div className="space-y-6">
@@ -644,13 +644,12 @@ export default function App() {
           />
         )}
 
-        {selectedCase && (
+        {selectedCase && user && (
           <CaseDetails 
             caseData={selectedCase} 
             onClose={() => setSelectedCaseId(null)} 
             onUpdate={handleUpdateCase}
-            userRole={user.role}
-            userPermissions={user.permissions || []}
+            currentUser={user}
             allCases={cases}
           />
         )}
