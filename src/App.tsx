@@ -587,7 +587,7 @@ export default function App() {
               {activeTab === 'cases' && user.permissions?.includes('create_case') && (
                 <button 
                   onClick={() => setIsFormOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-950 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-all shadow-lg shadow-indigo-200 active:scale-95"
                 >
                   <PlusCircle className="w-4 h-4" />
                   NEW FOLLOW-UP

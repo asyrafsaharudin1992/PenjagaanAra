@@ -256,7 +256,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
           </div>
           <button 
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-950 text-white rounded-lg font-bold text-sm hover:bg-slate-900 transition-all shadow-md shadow-indigo-200"
           >
             <Plus className="w-4 h-4" />
             ADD USER
