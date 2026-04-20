@@ -29,7 +29,10 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 // Explicitly check configuration
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-  console.error("Firebase Configuration is missing critical fields. Please check your setup.");
+  console.error("Firebase Configuration is missing critical fields. Please check your setup in firebase-applet-config.json.");
+} else {
+  console.log(`Connecting to Firebase Project: ${firebaseConfig.projectId}`);
+  console.log(`Using Firestore Database ID: ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
 }
 
 const app = initializeApp(firebaseConfig);
@@ -40,17 +43,20 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error("Auth persistence error:", error);
 });
 
+// Initialize Firestore with a default timeout hint
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Enable Offline Persistence for Firestore
+/**
+ * Enable Offline Persistence for Firestore
+ * NOTE: enableMultiTabIndexedDbPersistence can sometimes wait indefinitely if 
+ * previous tab sessions are hanging.
+ */
 if (typeof window !== 'undefined') {
   enableMultiTabIndexedDbPersistence(db).catch((err) => {
     if (err.code === 'failed-precondition') {
-      // Multiple tabs open, persistence can only be enabled in one tab at a time.
-      console.warn("Firestore persistence failed-precondition: Multiple tabs open.");
+      console.warn("Firestore persistence notice: Multiple tabs open. Persistence is active in another tab.");
     } else if (err.code === 'unimplemented') {
-      // The current browser does not support all of the features required to enable persistence
-      console.warn("Firestore persistence unimplemented: Browser not supported.");
+      console.warn("Firestore persistence notice: Browser not supported for local storage.");
     } else {
       console.error("Firestore persistence error:", err);
     }
@@ -93,8 +99,10 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email || undefined,
@@ -111,18 +119,46 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+
+  // Log detailed error to console for engineering
+  console.error('[Firestore Error Detail]:', JSON.stringify(errInfo, null, 2));
+
+  // Throw a descriptive error to be caught by UI or toast
+  if (errorMessage.includes('Insufficient permissions') || errorMessage.includes('permission-denied')) {
+    throw new Error("You don't have permission to perform this action. Your account role may have changed.");
+  } else if (errorMessage.includes('offline') || errorMessage.includes('Could not reach')) {
+    throw new Error("Connectivity issue. Please check your internet or disable VPN/Ad-blocker for this site.");
+  }
+  
+  throw new Error(errorMessage);
 }
 
-// Test connection
+// Test connection with a timeout
 async function testConnection() {
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Connection timed out after 10s')), 10000)
+  );
+
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. The client is offline.");
+    // Attempt a cold-start reach to server
+    await Promise.race([
+      getDocFromServer(doc(db, 'test', 'connection')),
+      timeoutPromise
+    ]);
+    console.log("Firestore connection test: SUCCESS");
+  } catch (error: any) {
+    console.warn("Firestore connection test: FAILED or TIMED OUT");
+    if (error.message.includes('offline') || error.message.includes('timed out')) {
+      console.error("CRITICAL: AraCare could not reach the database. Possible causes:");
+      console.error("1. VPN or Ad-blocker is blocking firestore.googleapis.com");
+      console.error("2. Corporate firewall restrictions.");
+      console.error("3. Incorrect databaseId in firebase-applet-config.json");
+      console.error("4. Device is currently offline.");
     }
   }
 }
-testConnection();
+
+// Only run test if we're in a browser environment
+if (typeof window !== 'undefined') {
+  testConnection();
+}

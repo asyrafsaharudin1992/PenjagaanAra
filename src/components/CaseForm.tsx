@@ -73,19 +73,37 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
   const [ncdFields, setNcdFields] = useState<NCDFields>(defaultNCDFields);
   // --- END ADDED ---
 
-  // Fetch tags dynamically
+  // Fetch tags dynamically with error handling - MERGE with defaults
   useEffect(() => {
-    const q = query(collection(db, 'tags'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tags = snapshot.docs.map(doc => doc.data().name as string);
-      if (tags.length === 0) {
-        const initialTags = ['AraMommy', 'AraChronic', 'AraWellness (weight loss)', 'Referral', 'others'];
-        setAvailableTags(initialTags);
-      } else {
-        setAvailableTags(tags);
-      }
-    });
-    return () => unsubscribe();
+    const defaultTags = ['AraMommy', 'AraChronic', 'AraWellness (weight loss)', 'Referral', 'others'];
+    
+    try {
+      // Try to fetch from Firestore, but don't use orderBy to avoid index requirement
+      const q = query(collection(db, 'tags'));
+      const unsubscribe = onSnapshot(
+        q, 
+        (snapshot) => {
+          const firestoreTags = snapshot.docs.map(doc => doc.data().name as string);
+          
+          // MERGE Firestore tags with default tags (remove duplicates)
+          const allTags = [...new Set([...defaultTags, ...firestoreTags])];
+          
+          // Sort tags alphabetically in memory instead of Firestore
+          const sortedTags = allTags.sort((a, b) => a.localeCompare(b));
+          setAvailableTags(sortedTags);
+        },
+        (error) => {
+          // If Firestore fails, use default tags only
+          console.error('Error fetching tags from Firestore:', error);
+          setAvailableTags(defaultTags);
+        }
+      );
+      return () => unsubscribe();
+    } catch (error) {
+      // If query setup fails, use default tags only
+      console.error('Error setting up tags query:', error);
+      setAvailableTags(defaultTags);
+    }
   }, []);
 
   // Check if patient is new when ID changes

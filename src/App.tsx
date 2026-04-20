@@ -162,8 +162,20 @@ export default function App() {
 
         // Fetch the full Firestore profile in the background.
         const userDocRef = doc(db, 'users', firebaseUser.uid);
+        
+        // Add a safety timeout for the profile fetch so the app doesn't hang on "Loading..."
+        const profileTimeout = setTimeout(() => {
+          if (loading) {
+            toast.error("Connecting to database is taking longer than expected. You may be offline or in a restricted network.", {
+              duration: 10000,
+              id: 'firestore-timeout'
+            });
+          }
+        }, 8000);
+
         try {
           const userDoc = await getDoc(userDocRef);
+          clearTimeout(profileTimeout);
 
           if (userDoc.exists()) {
             const raw = userDoc.data() as UserProfile;
