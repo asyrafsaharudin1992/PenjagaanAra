@@ -368,23 +368,23 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-              {step === 'upload' && <Upload className="w-5 h-5 text-indigo-600" />}
-              {step === 'mapping' && <Settings className="w-5 h-5 text-indigo-600" />}
-              {step === 'preview' && <Users className="w-5 h-5 text-indigo-600" />}
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+              {step === 'upload' && <Upload className="w-5 h-5 text-indigo-950" />}
+              {step === 'mapping' && <Settings className="w-5 h-5 text-indigo-950" />}
+              {step === 'preview' && <Users className="w-5 h-5 text-indigo-950" />}
             </div>
             <div>
-              <h3 className="font-bold text-slate-900">
-                {step === 'upload' && 'Upload CSV File'}
-                {step === 'mapping' && 'Map Columns'}
-                {step === 'preview' && 'Review & Import'}
+              <h3 className="text-xl font-bold text-slate-900 tracking-tight whitespace-nowrap">
+                {step === 'upload' && 'Import Patient Directory'}
+                {step === 'mapping' && 'Field Mapping'}
+                {step === 'preview' && 'Review & Import Patients'}
               </h3>
               <p className="text-xs text-slate-500">
                 {step === 'upload' && 'Step 1 of 3: Choose your CSV file'}
                 {step === 'mapping' && 'Step 2 of 3: Match your columns to our fields'}
-                {step === 'preview' && 'Step 3 of 3: Confirm and create cases'}
+                {step === 'preview' && 'Step 3 of 3: Confirm and import patients'}
               </p>
             </div>
           </div>
@@ -405,7 +405,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
               <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
                 Your CSV can have any column names. We'll help you map them in the next step!
               </p>
-              <label className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors cursor-pointer shadow-lg shadow-indigo-200">
+              <label className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-950 text-white rounded-lg font-medium hover:bg-slate-900 transition-colors cursor-pointer shadow-lg shadow-indigo-200">
                 <Upload className="w-5 h-5" />
                 Choose CSV File
                 <input
@@ -453,7 +453,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                           onClick={() => setBranchSource('fixed')}
                           className={cn(
                             "px-2 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all",
-                            branchSource === 'fixed' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                            branchSource === 'fixed' ? "bg-white text-indigo-950 shadow-sm" : "text-slate-500 hover:text-slate-700"
                           )}
                         >
                           Fixed
@@ -462,7 +462,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                           onClick={() => setBranchSource('csv')}
                           className={cn(
                             "px-2 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all",
-                            branchSource === 'csv' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                            branchSource === 'csv' ? "bg-white text-indigo-950 shadow-sm" : "text-slate-500 hover:text-slate-700"
                           )}
                         >
                           CSV
@@ -691,7 +691,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
               <button
                 onClick={handleApplyMapping}
                 disabled={isProcessing}
-                className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-950 text-white rounded-lg font-medium hover:bg-slate-900 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50"
               >
                 {isProcessing ? (
                   <>
@@ -714,7 +714,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                 <button
                   onClick={handleImportPatients}
                   disabled={validSelectedCount === 0 || isProcessing}
-                  className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
+                  className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-950 text-white rounded-lg font-medium hover:bg-slate-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200"
                 >
                   {isProcessing ? (
                     <>

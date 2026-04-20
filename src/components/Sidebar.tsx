@@ -23,7 +23,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
     <div className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col sticky top-0">
       <div className="p-6 flex-1">
         <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-indigo-950 rounded-lg flex items-center justify-center">
             <ClipboardList className="text-white w-5 h-5" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">AraCare</h1>
@@ -37,11 +37,11 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 activeTab === item.id
-                  ? "bg-indigo-50 text-indigo-700"
+                  ? "bg-indigo-50 text-indigo-950"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )}
             >
-              <item.icon className={cn("w-4 h-4", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
+              <item.icon className={cn("w-4 h-4", activeTab === item.id ? "text-indigo-950" : "text-slate-400")} />
               {item.label}
             </button>
           ))}
@@ -55,7 +55,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
           </div>
           <div className="overflow-hidden">
             <p className="text-sm font-bold text-slate-900 truncate">{user.displayName}</p>
-            <p className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wider">{user.role}</p>
+            <p className="text-[10px] font-semibold text-indigo-950 uppercase tracking-wider">{user.role}</p>
           </div>
         </div>
         

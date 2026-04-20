@@ -214,20 +214,20 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Follow-up Cases</h2>
-          <p className="text-slate-500 text-sm">Manage and track all patient follow-up requests.</p>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-2">
+        <div className="shrink-0">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight whitespace-nowrap">Follow-up Cases</h2>
+          <p className="text-slate-500 text-sm mt-1">Manage and track all patient follow-up requests.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <div className="flex flex-wrap items-center gap-2 justify-end">
+          <div className="relative group/search">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within/search:text-indigo-950 transition-colors" />
             <input 
               type="text"
-              placeholder="Search patients, diagnosis or doctors..."
+              placeholder="Search patients..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-full sm:w-64"
+              className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-950/20 focus:border-indigo-950 w-full sm:w-64 transition-all"
             />
           </div>
           <select 
@@ -311,7 +311,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                             e.stopPropagation();
                             setHistoryPatientId(c.patientId);
                           }}
-                          className="text-xs font-bold text-slate-900 hover:text-indigo-600 hover:underline text-left whitespace-normal break-words"
+                          className="text-xs font-semibold text-slate-900 hover:text-indigo-600 hover:underline text-left whitespace-normal break-words"
                         >
                           {c.patientName}
                         </button>
@@ -423,7 +423,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                                 text: textToCopy, 
                                 isLoading: false,
                                 title: 'Copy Notes',
-                                instruction: 'Sila salin nota di bawah:'
+                                instruction: 'Please copy the notes below:'
                               });
                               
                               if ((c.followUpTag || '').toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied) {
@@ -708,7 +708,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                 <button
                   onClick={executeReturn}
                   disabled={confirmModal.isProcessing}
-                  className="flex-1 px-4 py-2.5 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 bg-indigo-950 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {confirmModal.isProcessing ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -741,7 +741,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
               ) : (
                 <>
                   <p className="text-sm text-slate-600">
-                    {shareModal.instruction || 'Sila salin mesej di bawah:'}
+                    {shareModal.instruction || 'Please copy the message below:'}
                   </p>
                   <div className="relative">
                     <textarea 
@@ -753,9 +753,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(shareModal.text);
-                      toast.success('Mesej berjaya disalin!');
+                      toast.success('Message copied successfully!');
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-950 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-colors shadow-lg shadow-indigo-200"
                   >
                     <Copy className="w-4 h-4" />
                     COPY MESSAGE
@@ -806,7 +806,7 @@ function TagBadge({ tag }: { tag: FollowUpTag }) {
     'aramommy': "bg-pink-50 text-pink-700 border-pink-100",
     'arachronic': "bg-blue-50 text-blue-700 border-blue-100",
     'arawellness': "bg-emerald-50 text-emerald-700 border-emerald-100",
-    'referral': "bg-indigo-50 text-indigo-700 border-indigo-100",
+    'referral': "bg-indigo-50 text-indigo-950 border-indigo-100",
     'others': "bg-slate-50 text-slate-700 border-slate-100",
   };
 

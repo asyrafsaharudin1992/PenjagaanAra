@@ -385,7 +385,7 @@ export default function CaseDetails({
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-50 text-indigo-600"
+              "w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-50 text-indigo-950"
             )}>
               <Clock className="w-6 h-6" />
             </div>
@@ -493,7 +493,7 @@ export default function CaseDetails({
                   <select 
                     value={editedBranch}
                     onChange={(e) => setEditedBranch(e.target.value as ClinicBranch)}
-                    className="mt-1 text-[10px] font-bold px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full uppercase tracking-wider border-none focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                    className="mt-1 text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-950 rounded-full uppercase tracking-wider border-none focus:ring-2 focus:ring-indigo-950 outline-none cursor-pointer"
                   >
                     <option value="Kajang">Kajang Branch</option>
                     <option value="Seri Kembangan">Seri Kembangan Branch</option>
@@ -536,9 +536,9 @@ export default function CaseDetails({
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all uppercase tracking-wider",
                       caseData.followUpTag === s
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100"
-                        : "bg-white text-slate-600 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50/30",
-                      editedTag === s && caseData.followUpTag !== s && "ring-2 ring-indigo-500 ring-offset-2"
+                        ? "bg-indigo-950 text-white border-indigo-950 shadow-md shadow-indigo-100"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-indigo-950 hover:bg-indigo-50/30",
+                      editedTag === s && caseData.followUpTag !== s && "ring-2 ring-indigo-950 ring-offset-2"
                     )}
                   >
                     {s}
@@ -547,7 +547,7 @@ export default function CaseDetails({
                 {!availableTags.includes(caseData.followUpTag) && (
                   <button
                     className={cn(
-                      "px-3 py-1.5 rounded-lg text-[10px] font-bold border bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 uppercase tracking-wider",
+                      "px-3 py-1.5 rounded-lg text-[10px] font-bold border bg-indigo-950 text-white border-indigo-950 shadow-md shadow-indigo-100 uppercase tracking-wider",
                       editedTag === caseData.followUpTag ? "opacity-100" : "opacity-50"
                     )}
                   >
@@ -556,7 +556,7 @@ export default function CaseDetails({
                 )}
                 {editedTag && !availableTags.includes(editedTag) && editedTag !== caseData.followUpTag && (
                   <button
-                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold border bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100 uppercase tracking-wider ring-2 ring-indigo-500 ring-offset-2"
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold border bg-indigo-950 text-white border-indigo-950 shadow-md shadow-indigo-100 uppercase tracking-wider ring-2 ring-indigo-950 ring-offset-2"
                   >
                     {editedTag}
                   </button>
@@ -566,8 +566,8 @@ export default function CaseDetails({
                   className={cn(
                     "px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all uppercase tracking-wider",
                     showNewTagInput 
-                      ? "bg-indigo-50 text-indigo-600 border-indigo-200" 
-                      : "bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50"
+                      ? "bg-indigo-50 text-indigo-950 border-indigo-200" 
+                      : "bg-white text-indigo-950 border-indigo-100 hover:bg-indigo-50"
                   )}
                 >
                   + CREATE NEW TAG
@@ -626,14 +626,14 @@ export default function CaseDetails({
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Insights</label>
               {canUseAI && (
-                <button 
-                  onClick={handleSummarize}
-                  disabled={isSummarizing}
-                  className="text-xs font-bold text-indigo-600 flex items-center gap-1.5 hover:text-indigo-700 disabled:opacity-50"
-                >
-                  {isSummarizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  {aiSummary ? 'RE-ANALYZE' : 'GENERATE SUMMARY'}
-                </button>
+                  <button 
+                    onClick={handleSummarize}
+                    disabled={isSummarizing}
+                    className="text-xs font-bold text-indigo-950 flex items-center gap-1.5 hover:text-slate-900 disabled:opacity-50"
+                  >
+                    {isSummarizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {aiSummary ? 'RE-ANALYZE' : 'GENERATE SUMMARY'}
+                  </button>
               )}
             </div>
             {aiSummary && (

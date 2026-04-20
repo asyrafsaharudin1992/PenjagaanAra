@@ -252,8 +252,8 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h3 className="font-bold text-slate-900">New Follow-up Case</h3>
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+          <h3 className="text-xl font-bold text-slate-900 tracking-tight">New Follow-up Case</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -262,15 +262,15 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           {/* Existing Patient Alert */}
           {!isNewPatient && formData.patientId && (
-            <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
-              <AlertCircle className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex items-start gap-3 animate-in slide-in-from-top-2 duration-300">
+              <AlertCircle className="w-5 h-5 text-indigo-950 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-bold text-indigo-900">Existing Patient Detected</p>
-                <p className="text-xs text-indigo-700 mt-0.5">Would you like to have a look at previous follow-up notes for this patient?</p>
+                <p className="text-sm font-bold text-slate-900">Existing Patient Detected</p>
+                <p className="text-xs text-slate-600 mt-0.5">Would you like to have a look at previous follow-up notes for this patient?</p>
                 <button 
                   type="button"
                   onClick={() => setShowHistory(!showHistory)}
-                  className="mt-2 text-xs font-bold text-indigo-600 underline hover:text-indigo-800"
+                  className="mt-2 text-xs font-bold text-indigo-950 underline hover:text-slate-900"
                 >
                   {showHistory ? "Hide History" : "View History Notes"}
                 </button>
@@ -429,7 +429,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
                         setNewTagValue('');
                       }
                     }}
-                    className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold"
+                    className="px-3 py-2 bg-indigo-950 text-white rounded-lg text-xs font-bold"
                   >
                     ADD
                   </button>
@@ -452,7 +452,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
                 type="button"
                 onClick={handleSuggestUrgency}
                 disabled={!formData.diagnosis || isAnalyzing}
-                className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 hover:text-indigo-700 disabled:opacity-50"
+                className="text-[10px] font-bold text-indigo-950 flex items-center gap-1 hover:text-slate-900 disabled:opacity-50"
               >
                 {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                 AI SUGGEST TAG
@@ -657,7 +657,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
             </button>
             <button 
               type="submit"
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+              className="flex-1 px-4 py-2 bg-indigo-950 text-white rounded-lg text-sm font-medium hover:bg-slate-900 transition-colors shadow-sm shadow-indigo-200"
             >
               Create Case
             </button>

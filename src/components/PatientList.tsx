@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Filter, User, Phone, MapPin, Tag, Calendar, MoreVertical, Trash2, ExternalLink, ClipboardList, MessageCircle, AlertTriangle, X, Check } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Filter, User, Phone, MapPin, Tag, Calendar, MoreVertical, Trash2, ExternalLink, ClipboardList, MessageCircle, AlertTriangle, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, limit, setDoc } from 'firebase/firestore';
 import { Patient, UserProfile, FollowUpCase } from '../types';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface PatientListProps {
   currentUser: UserProfile;
@@ -16,7 +17,9 @@ export default function PatientList({ currentUser }: PatientListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState<string>('All');
   const [tagFilter, setTagFilter] = useState<string>('All');
-  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
   // Modal states
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -31,7 +34,7 @@ export default function PatientList({ currentUser }: PatientListProps) {
   });
 
   // Fetch patients
-  React.useEffect(() => {
+  useEffect(() => {
     let q = query(collection(db, 'patients'), orderBy('createdAt', 'desc'), limit(1000));
     
     // If not superadmin, maybe limit by branch if that's the policy?
@@ -66,6 +69,25 @@ export default function PatientList({ currentUser }: PatientListProps) {
     return Array.from(tags).sort();
   }, [patients]);
 
+  const getTagColorHex = (tag: string) => {
+    const t = tag.toLowerCase().trim();
+    if (t === 'aramommy') return '#ec4899'; // pink-500
+    if (t.includes('wellness') || t === 'arawellness') return '#10b981'; // emerald-500
+    if (t.includes('referral')) return '#6366f1'; // indigo-500
+    return '#94a3b8'; // slate-400 default
+  };
+
+  const chartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    patients.forEach(p => {
+      const t = p.tag || 'Others';
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [patients]);
+
   const filteredPatients = patients.filter(p => {
     const matchesSearch = 
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -77,6 +99,49 @@ export default function PatientList({ currentUser }: PatientListProps) {
 
     return matchesSearch && matchesBranch && matchesTag;
   });
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, branchFilter, tagFilter]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedPatients = filteredPatients.slice(startIndex, startIndex + itemsPerPage);
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+
+    return pages.map((page, index) => (
+      <button
+        key={index}
+        disabled={page === '...'}
+        onClick={() => typeof page === 'number' && setCurrentPage(page)}
+        className={cn(
+          "w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors border",
+          page === currentPage
+            ? "bg-indigo-950 text-white border-indigo-950"
+            : page === '...'
+            ? "text-slate-400 cursor-default border-transparent"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 bg-white border-slate-200"
+        )}
+      >
+        {page}
+      </button>
+    ));
+  };
 
   const handleDeletePatient = async (id: string, name: string) => {
     if (!['Superadmin', 'Admin'].includes(currentUser.role)) {
@@ -178,20 +243,20 @@ export default function PatientList({ currentUser }: PatientListProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-4 border-slate-100 border-t-indigo-950 rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Patient Directory</h2>
-          <p className="text-slate-500 text-sm">Manage centralized patient profiles imported from CSV.</p>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-2">
+        <div className="shrink-0">
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight whitespace-nowrap">Patient Directory</h2>
+          <p className="text-slate-500 text-sm mt-1">Manage centralized patient profiles imported from CSV.</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 justify-end">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
@@ -226,6 +291,31 @@ export default function PatientList({ currentUser }: PatientListProps) {
         </div>
       </div>
 
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Patient Distribution by Tag</h3>
+          <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Total limit: 1000</span>
+        </div>
+        <div className="h-48 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} allowDecimals={false} />
+              <Tooltip 
+                cursor={{ fill: '#f8fafc' }} 
+                contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+              />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={40}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={getTagColorHex(entry.name)} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
@@ -239,15 +329,15 @@ export default function PatientList({ currentUser }: PatientListProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredPatients.map((p) => (
+              {paginatedPatients.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-950">
                         <User className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-900">{p.name}</p>
+                        <p className="text-sm font-semibold text-slate-900">{p.name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] text-slate-400 font-medium">ID: {p.patientId}</span>
                           <span className="text-slate-300">•</span>
@@ -266,7 +356,7 @@ export default function PatientList({ currentUser }: PatientListProps) {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 rounded-lg text-[10px] font-bold text-indigo-600 uppercase border border-indigo-100">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 rounded-lg text-[10px] font-bold text-indigo-950 uppercase border border-indigo-100">
                       <Tag className="w-3 h-3" />
                       {p.tag}
                     </span>
@@ -281,7 +371,7 @@ export default function PatientList({ currentUser }: PatientListProps) {
                     <div className="flex items-center justify-end gap-2">
                       <button 
                         onClick={() => handleMoveToFollowUp(p)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-100 transition-all uppercase tracking-wider"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-950 text-white rounded-lg text-[10px] font-bold hover:bg-slate-900 transition-all uppercase tracking-wider"
                         title="Move to Follow-up Cases"
                       >
                         <ClipboardList className="w-3.5 h-3.5" />
@@ -325,6 +415,38 @@ export default function PatientList({ currentUser }: PatientListProps) {
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {filteredPatients.length > itemsPerPage && (
+          <div className="px-6 py-4 flex items-center justify-between border-t border-slate-200 bg-slate-50/50">
+            <span className="text-sm text-slate-500 font-medium">
+              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredPatients.length)} of {filteredPatients.length} patients
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous Page"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              
+              <div className="flex items-center gap-1">
+                {renderPageNumbers()}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next Page"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Confirmation Modal */}
@@ -334,7 +456,7 @@ export default function PatientList({ currentUser }: PatientListProps) {
             <div className="p-6 text-center">
               <div className={cn(
                 "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4",
-                confirmModal.type === 'delete' ? "bg-red-50 text-red-600" : "bg-indigo-50 text-indigo-600"
+                confirmModal.type === 'delete' ? "bg-red-50 text-red-600" : "bg-indigo-50 text-indigo-950"
               )}>
                 {confirmModal.type === 'delete' ? <Trash2 className="w-8 h-8" /> : <ClipboardList className="w-8 h-8" />}
               </div>
@@ -365,7 +487,7 @@ export default function PatientList({ currentUser }: PatientListProps) {
                     "flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50",
                     confirmModal.type === 'delete' 
                       ? "bg-red-600 hover:bg-red-700 shadow-red-100" 
-                      : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"
+                      : "bg-indigo-950 hover:bg-slate-900 shadow-indigo-100"
                   )}
                 >
                   {confirmModal.isProcessing ? (

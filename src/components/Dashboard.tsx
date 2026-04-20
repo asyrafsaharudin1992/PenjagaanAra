@@ -129,8 +129,8 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900">Clinic Overview</h2>
-        <p className="text-slate-500 text-sm">Welcome back, {userName || 'staff member'}. Here's what's happening today.</p>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Clinic Overview</h2>
+        <p className="text-slate-500 text-sm mt-1">Welcome back, {userName || 'staff'}. Here's what's happening today.</p>
       </div>
 
       {/* Stats Grid — always full data */}
@@ -139,14 +139,14 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
           title="PROCESSED CASES" 
           value={totalDatabaseCases ?? cases.length} 
           icon={ClipboardList} 
-          color="blue" 
+          color="navy" 
           trend="Actual lifetime total"
         />
         <StatCard 
           title="ACTIVE LIST" 
           value={cases.length} 
           icon={TrendingUp} 
-          color="indigo" 
+          color="navy" 
           trend="Current viewing window"
         />
         {allSortedTags.map(([tag, count]) => (
@@ -155,7 +155,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
             title={tag} 
             value={count} 
             icon={getTagIcon(tag)} 
-            color={getTagColor(tag)} 
+            color={getTagColor(tag) === 'indigo' ? 'navy' : getTagColor(tag)} 
             trend={`Total ${tag} cases`}
           />
         ))}
@@ -170,7 +170,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
             <div>
               <h3 className="font-semibold text-slate-900">Case Distribution</h3>
               {hasActiveFilter && (
-                <p className="text-xs text-indigo-600 font-medium mt-0.5">
+                <p className="text-xs text-indigo-950 font-medium mt-0.5">
                   Filtered: {filterLabel()} · {filteredCases.length} cases
                 </p>
               )}
@@ -193,7 +193,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
                 className={cn(
                   "appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all outline-none",
                   selectedYear !== 'all'
-                    ? "bg-indigo-600 text-white border-indigo-600"
+                    ? "bg-indigo-950 text-white border-indigo-950"
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300"
                 )}
               >
@@ -216,7 +216,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
                 className={cn(
                   "appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all outline-none",
                   selectedMonth !== 'all'
-                    ? "bg-indigo-600 text-white border-indigo-600"
+                    ? "bg-indigo-950 text-white border-indigo-950"
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300"
                 )}
               >
@@ -239,7 +239,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
                 className={cn(
                   "appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all outline-none",
                   selectedTag !== 'all'
-                    ? "bg-indigo-600 text-white border-indigo-600"
+                    ? "bg-indigo-950 text-white border-indigo-950"
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-300"
                 )}
               >
@@ -364,6 +364,7 @@ function getTagIcon(tag: string) {
 function StatCard({ title, value, icon: Icon, color, trend }: any) {
   const colors: any = {
     indigo: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    navy: "bg-indigo-50 text-indigo-950 border-indigo-100",
     pink: "bg-pink-50 text-pink-600 border-pink-100",
     blue: "bg-blue-50 text-blue-600 border-blue-100",
     emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",

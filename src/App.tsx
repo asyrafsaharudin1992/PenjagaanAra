@@ -432,7 +432,7 @@ export default function App() {
       <div className="min-h-screen bg-slate-50 overflow-y-auto flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200 max-w-md w-full space-y-8">
           <div className="text-center space-y-4">
-            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-indigo-200">
+            <div className="w-16 h-16 bg-indigo-950 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-indigo-200">
               <ClipboardList className="text-white w-8 h-8" />
             </div>
             <div>
@@ -562,13 +562,13 @@ export default function App() {
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Desktop Only</h1>
           <p className="text-slate-500 mt-2 text-sm leading-relaxed">
-            Sila log masuk menggunakan komputer (Desktop) untuk mengakses sistem pengurusan klinik ini.
+            Please log in using a computer (Desktop) to access the clinic management system.
           </p>
           <button 
             onClick={handleLogout}
             className="mt-6 w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors"
           >
-            LOG KELUAR
+            LOG OUT
           </button>
         </div>
       </div>
@@ -607,7 +607,7 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => setShowCSVImport(true)}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-950 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition-all shadow-lg shadow-indigo-200 active:scale-95"
                   >
                     <Upload className="w-4 h-4" />
                     IMPORT PATIENTS
