@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Upload, X, AlertCircle, CheckCircle, ArrowRight, FileText, Users, Settings, Tag, Building2 } from 'lucide-react';
+import { Upload, X, AlertCircle, CheckCircle, ArrowRight, FileText, Users, Settings, Tag, Building2, AlertTriangle } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { FollowUpCase, UserProfile, ClinicBranch, FollowUpTag } from '../types';
-import { normalizeBranch } from '../lib/utils';
+import { normalizeBranch, cn } from '../lib/utils';
 
 interface ImportedPatient {
   patientId: string;
@@ -19,6 +19,7 @@ interface ImportedPatient {
   remarks?: string;
   isValid: boolean;
   missingFields: string[];
+  isDuplicate?: boolean;
   rawData: any;
 }
 
@@ -64,6 +65,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [selectedBranch, setSelectedBranch] = useState<ClinicBranch>((currentUser.role === 'Superadmin' ? 'Kajang' : (normalizeBranch(currentUser.branch) as ClinicBranch || 'Kajang')));
+  const [branchSource, setBranchSource] = useState<'fixed' | 'csv'>('fixed');
   const [selectedTag, setSelectedTag] = useState<string>('Follow-up');
   const [availableBranches, setAvailableBranches] = useState<string[]>(['Kajang', 'Seri Kembangan']);
   const [availableTags, setAvailableTags] = useState<string[]>(availableSystemTags.length > 0 ? availableSystemTags : [
@@ -181,7 +183,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
     setColumnMapping(prev => ({ ...prev, [field]: csvColumn }));
   };
 
-  const handleApplyMapping = () => {
+  const handleApplyMapping = async () => {
     if (!columnMapping.patientName) {
       toast.error('Patient Name column is required');
       return;
@@ -191,36 +193,66 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
       return;
     }
 
-    const patients: ImportedPatient[] = csvData.map((row, index) => {
-      const patient: any = {
-        patientId: columnMapping.patientId ? row[columnMapping.patientId] : `AUTO-${Date.now()}-${index}`,
-        patientName: columnMapping.patientName ? row[columnMapping.patientName] : '',
-        patientPhone: columnMapping.patientPhone ? row[columnMapping.patientPhone] : '',
-        diagnosis: columnMapping.diagnosis ? row[columnMapping.diagnosis] : 'To be determined',
-        doctorInCharge: columnMapping.doctorInCharge ? row[columnMapping.doctorInCharge] : 'To be assigned',
-        branch: columnMapping.branch ? row[columnMapping.branch] : defaultBranch,
-        lastVisitDate: columnMapping.lastVisitDate ? row[columnMapping.lastVisitDate] : '',
-        appointmentDate: columnMapping.appointmentDate ? row[columnMapping.appointmentDate] : '',
-        followUpTag: columnMapping.followUpTag ? row[columnMapping.followUpTag] : 'others',
-        remarks: columnMapping.remarks ? row[columnMapping.remarks] : 'Imported from CSV - pending details',
-        rawData: row,
-      };
+    setIsProcessing(true);
+    try {
+      // Fetch existing patients to check for duplicates
+      const patientsSnapshot = await getDocs(collection(db, 'patients'));
+      const existingIds = new Set(patientsSnapshot.docs.map(d => String(d.data().patientId || '').trim()));
+      const existingNames = new Set(patientsSnapshot.docs.map(d => String(d.data().name || '').trim().toLowerCase()));
 
-      const missingFields: string[] = [];
-      if (!patient.patientName) missingFields.push('Patient Name');
-      if (!patient.patientPhone) missingFields.push('Phone Number');
+      const patients: ImportedPatient[] = csvData.map((row, index) => {
+        const patient: any = {
+          patientId: columnMapping.patientId ? String(row[columnMapping.patientId] || '').trim() : `AUTO-${Date.now()}-${index}`,
+          patientName: columnMapping.patientName ? String(row[columnMapping.patientName] || '').trim() : '',
+          patientPhone: columnMapping.patientPhone ? String(row[columnMapping.patientPhone] || '').trim() : '',
+          diagnosis: columnMapping.diagnosis ? row[columnMapping.diagnosis] : 'To be determined',
+          doctorInCharge: columnMapping.doctorInCharge ? row[columnMapping.doctorInCharge] : 'To be assigned',
+          branch: branchSource === 'csv' && columnMapping.branch 
+            ? (normalizeBranch(row[columnMapping.branch]) as ClinicBranch || selectedBranch)
+            : selectedBranch,
+          lastVisitDate: columnMapping.lastVisitDate ? row[columnMapping.lastVisitDate] : '',
+          appointmentDate: columnMapping.appointmentDate ? row[columnMapping.appointmentDate] : '',
+          followUpTag: columnMapping.followUpTag ? row[columnMapping.followUpTag] : 'others',
+          remarks: columnMapping.remarks ? row[columnMapping.remarks] : 'Imported from CSV - pending details',
+          rawData: row,
+        };
 
-      return {
-        ...patient,
-        isValid: missingFields.length === 0,
-        missingFields,
-      };
-    });
+        const missingFields: string[] = [];
+        if (!patient.patientName) missingFields.push('Patient Name');
+        if (!patient.patientPhone) missingFields.push('Phone Number');
 
-    setImportedData(patients);
-    setSelectedRows(new Set(patients.map((_, idx) => idx)));
-    setStep('preview');
-    toast.success('Column mapping applied! Review data below.');
+        const isDuplicate = existingIds.has(patient.patientId) || existingNames.has(patient.patientName.toLowerCase());
+
+        return {
+          ...patient,
+          isDuplicate,
+          isValid: missingFields.length === 0,
+          missingFields,
+        };
+      });
+
+      setImportedData(patients);
+      
+      // Auto-select ONLY non-duplicates by default
+      const nonDuplicateIndices = patients
+        .map((p, idx) => p.isDuplicate ? -1 : idx)
+        .filter(idx => idx !== -1);
+      
+      setSelectedRows(new Set(nonDuplicateIndices));
+      
+      setStep('preview');
+      const duplicateCount = patients.filter(p => p.isDuplicate).length;
+      if (duplicateCount > 0) {
+        toast.warning(`Detected ${duplicateCount} potential duplicates. They have been unselected by default.`);
+      } else {
+        toast.success('Column mapping applied! Review data below.');
+      }
+    } catch (error) {
+      console.error("Mapping error:", error);
+      toast.error("Failed to process mapping. Check connection.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const toggleRowSelection = (index: number) => {
@@ -272,7 +304,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
             patientId: String(patient.patientId || `P-${Date.now()}`),
             name: String(patient.patientName || 'Unknown'),
             phone: String(patient.patientPhone || '').replace(/\s+/g, ''),
-            branch: selectedBranch,
+            branch: (patient.branch as ClinicBranch) || selectedBranch,
             tag: selectedTag,
             createdAt: new Date().toISOString(),
             createdByEmail: currentUser?.email || '',
@@ -411,24 +443,54 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                 </h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5" />
-                      Branch (Cawangan)
-                    </label>
-                    <select
-                      value={selectedBranch}
-                      onChange={(e) => setSelectedBranch(e.target.value as ClinicBranch)}
-                      disabled={currentUser.role !== 'Superadmin'}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-indigo-500/10 outline-none disabled:bg-slate-100 disabled:text-slate-500"
-                    >
-                      {currentUser.role === 'Superadmin' ? (
-                        availableBranches.map(branch => (
-                          <option key={branch} value={branch}>{branch}</option>
-                        ))
-                      ) : (
-                        <option value={selectedBranch}>{selectedBranch}</option>
-                      )}
-                    </select>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5" />
+                        Branch (Cawangan)
+                      </label>
+                      <div className="flex bg-slate-200 p-0.5 rounded-lg border border-slate-300">
+                        <button 
+                          onClick={() => setBranchSource('fixed')}
+                          className={cn(
+                            "px-2 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all",
+                            branchSource === 'fixed' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                          )}
+                        >
+                          Fixed
+                        </button>
+                        <button 
+                          onClick={() => setBranchSource('csv')}
+                          className={cn(
+                            "px-2 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all",
+                            branchSource === 'csv' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                          )}
+                        >
+                          CSV
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {branchSource === 'fixed' ? (
+                      <select
+                        value={selectedBranch}
+                        onChange={(e) => setSelectedBranch(e.target.value as ClinicBranch)}
+                        disabled={currentUser.role !== 'Superadmin'}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-indigo-500/10 outline-none disabled:bg-slate-100 disabled:text-slate-500 transition-all shadow-sm"
+                      >
+                        {currentUser.role === 'Superadmin' ? (
+                          availableBranches.map(branch => (
+                            <option key={branch} value={branch}>{branch}</option>
+                          ))
+                        ) : (
+                          <option value={selectedBranch}>{selectedBranch}</option>
+                        )}
+                      </select>
+                    ) : (
+                      <div className="animate-in slide-in-from-left-2 duration-300">
+                        <ColumnMappingSelector field="branch" label="Branch Column from CSV" required />
+                        <p className="text-[9px] text-slate-400 mt-1 italic">Normalized to: Kajang or Seri Kembangan</p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
@@ -452,6 +514,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                 <h5 className="text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">Other Optional Fields (CSV Mapping)</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <ColumnMappingSelector field="patientId" label="Patient ID (auto-generated if empty)" required={false} />
+                  {branchSource === 'fixed' && <div />} {/* Placeholder to keep grid balanced if mapping branch is not here */}
                   <ColumnMappingSelector field="diagnosis" label="Diagnosis (default: 'To be determined')" required={false} />
                   <ColumnMappingSelector field="doctorInCharge" label="Doctor (default: 'To be assigned')" required={false} />
                   <ColumnMappingSelector field="lastVisitDate" label="Last Visit Date" required={false} />
@@ -538,16 +601,23 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                       />
                       
                       <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             {patient.isValid ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold">
-                                <CheckCircle className="w-3 h-3" />
-                                READY
-                              </span>
+                              patient.isDuplicate ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  DUPLICATE
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs font-bold">
+                                  <CheckCircle className="w-3 h-3" />
+                                  READY
+                                </span>
+                              )
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-bold">
-                                <AlertCircle className="w-3 h-3" />
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold">
+                                <X className="w-3 h-3" />
                                 INCOMPLETE
                               </span>
                             )}
@@ -555,22 +625,26 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                           <span className="text-xs text-slate-400">Row {index + 1}</span>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
                           <div>
                             <span className="text-xs text-slate-500">ID:</span>
-                            <p className="font-semibold text-slate-900">{patient.patientId || '-'}</p>
+                            <p className="font-semibold text-slate-900 truncate">{patient.patientId || '-'}</p>
                           </div>
                           <div>
                             <span className="text-xs text-slate-500">Name:</span>
-                            <p className="font-semibold text-slate-900">{patient.patientName || '-'}</p>
+                            <p className="font-semibold text-slate-900 truncate">{patient.patientName || '-'}</p>
                           </div>
                           <div>
                             <span className="text-xs text-slate-500">Phone:</span>
                             <p className="font-semibold text-slate-900">{patient.patientPhone || '-'}</p>
                           </div>
                           <div>
+                            <span className="text-xs text-slate-500">Branch:</span>
+                            <p className="font-semibold text-indigo-600">{patient.branch || '-'}</p>
+                          </div>
+                          <div>
                             <span className="text-xs text-slate-500">Doctor:</span>
-                            <p className="font-semibold text-slate-900">{patient.doctorInCharge || '-'}</p>
+                            <p className="font-semibold text-slate-900 truncate">{patient.doctorInCharge || '-'}</p>
                           </div>
                         </div>
 
@@ -616,10 +690,20 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
             {step === 'mapping' && (
               <button
                 onClick={handleApplyMapping}
-                className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                disabled={isProcessing}
+                className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50"
               >
-                Continue to Preview
-                <ArrowRight className="w-4 h-4" />
+                {isProcessing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Checking Duplicates...
+                  </>
+                ) : (
+                  <>
+                    Continue to Preview
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             )}
             {step === 'preview' && (
