@@ -12,11 +12,11 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: SidebarProps) {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard' as UserPermission },
-    { id: 'cases', label: 'Follow-up Cases', icon: ClipboardList, permission: 'view_history' as UserPermission },
-    { id: 'todo', label: 'To Do List', icon: ClipboardList, permission: 'view_history' as UserPermission },
-    { id: 'patients', label: 'Patients', icon: Users, permission: 'view_history' as UserPermission },
-    { id: 'users', label: 'Users', icon: UserIcon, permission: 'manage_users' as UserPermission },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard' as UserPermission, tooltip: "Overview of clinic activity" },
+    { id: 'cases', label: 'Follow-up Cases', icon: ClipboardList, permission: 'view_history' as UserPermission, tooltip: "Cases that have already been followed up" },
+    { id: 'todo', label: 'To Do List', icon: ClipboardList, permission: 'view_history' as UserPermission, tooltip: "Reminders and Doctor's requests" },
+    { id: 'patients', label: 'Patients', icon: Users, permission: 'view_history' as UserPermission, tooltip: "List of patients who need follow-up but have not yet been contacted" },
+    { id: 'users', label: 'Users', icon: UserIcon, permission: 'manage_users' as UserPermission, tooltip: "Manage staff accounts and permissions" },
   ];
 
   return (
@@ -34,6 +34,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
+              title={item.tooltip}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 activeTab === item.id
