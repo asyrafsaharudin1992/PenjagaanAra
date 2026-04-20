@@ -25,13 +25,15 @@ interface CaseListProps {
   cases: FollowUpCase[];
   onViewCase: (caseId: string) => void;
   userPermissions: UserPermission[];
+  userRole?: string;
   tagFilter: string | null;
   setTagFilter: (tag: string | null) => void;
 }
 
-export default function CaseList({ cases, onViewCase, userPermissions, tagFilter, setTagFilter }: CaseListProps) {
+export default function CaseList({ cases, onViewCase, userPermissions, userRole, tagFilter, setTagFilter }: CaseListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FollowUpTag | 'All'>(tagFilter ? (tagFilter as FollowUpTag) : 'All');
+  const [branchFilter, setBranchFilter] = useState<string>('All');
 
   React.useEffect(() => {
     if (tagFilter) {
@@ -98,7 +100,8 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
     const matchesSearch = (c.patientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
                           (c.diagnosis?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                           (c.doctorInCharge?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                          (c.patientId?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+                          (c.patientId?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                          (c.branch?.toLowerCase() || '').includes(searchTerm.toLowerCase());
                           
     let matchesStatus = true;
     if (statusFilter !== 'All') {
@@ -113,6 +116,8 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
         matchesStatus = normalizedTag === filterLower;
       }
     }
+
+    const matchesBranch = branchFilter === 'All' || c.branch === branchFilter;
     
     const caseDate = new Date(c.createdAt);
     caseDate.setHours(0, 0, 0, 0);
@@ -126,7 +131,7 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
     const matchesDate = (!start || caseDate >= start) &&
                         (!end || caseDate <= end);
 
-    return matchesSearch && matchesStatus && matchesDate;
+    return matchesSearch && matchesStatus && matchesBranch && matchesDate;
   });
 
   // Pagination logic
@@ -183,6 +188,17 @@ export default function CaseList({ cases, onViewCase, userPermissions, tagFilter
               <option key={tag} value={tag}>{tag}</option>
             ))}
           </select>
+          {userRole === 'Superadmin' && (
+            <select 
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            >
+              <option value="All">All Branches</option>
+              <option value="Kajang">Kajang</option>
+              <option value="Seri Kembangan">Seri Kembangan</option>
+            </select>
+          )}
           <div className="flex items-center gap-2">
             <input
               type="date"

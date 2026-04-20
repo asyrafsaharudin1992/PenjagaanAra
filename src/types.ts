@@ -23,11 +23,17 @@ export interface UserProfile {
 export type FollowUpTag = string;
 
 export interface Patient {
-  id: string;
+  id: string; // Firestore document ID
+  patientId: string; // User-keyed patient ID
   name: string;
   phone: string;
   email?: string;
-  dateOfBirth: string;
+  dateOfBirth?: string;
+  branch: ClinicBranch;
+  tag: string;
+  createdAt: string;
+  createdByEmail?: string;
+  createdByUid?: string;
 }
 
 export type ClinicBranch = 'Kajang' | 'Seri Kembangan';

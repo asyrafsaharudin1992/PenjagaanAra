@@ -93,6 +93,19 @@ service cloud.firestore {
              data.permissions is list;
     }
 
+    function isValidPatient(data) {
+      return data.keys().hasAll(['id', 'name', 'phone', 'branch', 'tag', 'createdAt']) &&
+             data.id is string &&
+             data.name is string &&
+             data.phone is string &&
+             data.branch in ['Kajang', 'Seri Kembangan'] &&
+             data.tag is string &&
+             data.createdAt is string &&
+             (!('patientId' in data) || data.patientId is string) &&
+             (!('createdByEmail' in data) || data.createdByEmail is string) &&
+             (!('createdByUid' in data) || data.createdByUid is string);
+    }
+
     function isValidCase(data) {
       return data.keys().hasAll(['id', 'patientId', 'patientName', 'branch', 'diagnosis', 'doctorInCharge', 'followUpTag']) &&
              data.id is string &&
@@ -136,11 +149,13 @@ service cloud.firestore {
 
     match /patients/{patientId} {
       allow read: if isDoctor();
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && isValidPatient(request.resource.data);
+      allow delete: if isDoctor();
     }
 
     match /cases/{caseId} {
-      allow read: if isDoctor() && (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(resource.data.branch)));
+      allow list: if isDoctor(); // Allow list/count for stats, security is on individual 'get' and specific queries
+      allow get: if isDoctor() && (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(resource.data.branch)));
       allow create: if isDoctor() && isValidCase(request.resource.data) && 
                     (isSuperadmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userHasBranchAccess(request.resource.data.branch))) &&
                     ('createdByEmail' in request.resource.data) && request.resource.data.createdByEmail == request.auth.token.email &&
@@ -177,8 +192,14 @@ service cloud.firestore {
     }
 
     match /tags/{tagId} {
-      allow read: if isAuthenticated();
+      allow get, list: if isAuthenticated();
       allow create, update: if isDoctor();
+      allow delete: if isSuperadmin();
+    }
+
+    match /branches/{branchId} {
+      allow get, list: if isAuthenticated();
+      allow create, update: if isSuperadmin();
       allow delete: if isSuperadmin();
     }
 

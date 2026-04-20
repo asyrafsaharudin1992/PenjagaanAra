@@ -19,10 +19,12 @@ import PublicRequestsList from './components/PublicRequestsList';
 import ErrorBoundary from './components/ErrorBoundary';
 import { FollowUpCase, UserProfile, UserRole } from './types';
 import { normalizeBranch } from './lib/utils';
-import { PlusCircle, LogIn, Loader2, ClipboardList, Lock, Mail, AlertCircle, Chrome } from 'lucide-react';
+import { PlusCircle, LogIn, Loader2, ClipboardList, Lock, Mail, AlertCircle, Chrome, Upload } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
 import WellnessForm from './components/WellnessForm';
+import CSVImport from './components/CSVImport';
+import PatientList from './components/PatientList';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIX 4 – Superadmin role escalation
@@ -83,6 +85,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<FollowUpCase[]>([]);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showCSVImport, setShowCSVImport] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
@@ -231,7 +234,7 @@ export default function App() {
 
     let q;
     if (user.role === 'Superadmin') {
-      q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'), limit(25));
+      q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'), limit(500));
     } else {
       if (!user.branch) {
         setCases([]);
@@ -242,7 +245,7 @@ export default function App() {
         collection(db, 'cases'), 
         where('branch', '==', user.branch),
         orderBy('createdAt', 'desc'),
-        limit(25)
+        limit(500)
       );
     }
 
@@ -379,6 +382,26 @@ export default function App() {
     }
     setActiveTab(tabId);
   };
+
+  // Derive tags from current cases list efficiently
+  const availableSystemTags = React.useMemo(() => {
+    const normalizeTag = (tag: string): string => {
+      const t = tag.toLowerCase().trim();
+      if (t === 'aramommy') return 'AraMommy';
+      if (t === 'arachronic') return 'AraChronic';
+      if (t.includes('arawellness')) return 'AraWellness';
+      if (t.includes('referral')) return 'Referral';
+      return tag.trim();
+    };
+    
+    const seen = new Set<string>();
+    cases.forEach(c => {
+      if (c.followUpTag) seen.add(normalizeTag(c.followUpTag));
+    });
+    // Add default fallbacks if not present
+    ['Referral', 'AraMommy', 'AraWellness', 'AraChronic', 'Routine', 'Follow-up'].forEach(t => seen.add(t));
+    return Array.from(seen).sort();
+  }, [cases]);
 
   const selectedCase = cases.find(c => c.id === selectedCaseId);
 
@@ -573,16 +596,43 @@ export default function App() {
             </div>
 
             {activeTab === 'dashboard' && <Dashboard cases={cases} userName={user.displayName} onFilterByTag={(tag) => { setTagFilter(tag); setActiveTab('cases'); }} />}
-            {activeTab === 'cases' && <CaseList cases={cases} onViewCase={setSelectedCaseId} userPermissions={user.permissions || []} tagFilter={tagFilter} setTagFilter={setTagFilter} />}
+            {activeTab === 'cases' && <CaseList cases={cases} onViewCase={setSelectedCaseId} userPermissions={user.permissions || []} userRole={user.role} tagFilter={tagFilter} setTagFilter={setTagFilter} />}
             {activeTab === 'todo' && <TodoList user={user} />}
             {activeTab === 'patients' && (
-              <div className="p-12 text-center bg-white rounded-2xl border border-slate-200">
-                <h2 className="text-xl font-bold text-slate-900">Patient Directory</h2>
-                <p className="text-slate-500 mt-2">This feature is coming soon. You can currently manage patients through individual cases.</p>
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-between shadow-sm">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900 leading-tight">Bulk Import</h2>
+                    <p className="text-sm text-slate-500 mt-1">Upload CSV data to populate your patient directory.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowCSVImport(true)}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95"
+                  >
+                    <Upload className="w-4 h-4" />
+                    IMPORT PATIENTS
+                  </button>
+                </div>
+                
+                <PatientList currentUser={user} />
               </div>
             )}
             {activeTab === 'users' && <UserManagement currentUser={user} />}
           </div>
+
+          {/* CSV IMPORT MODAL */}
+          {showCSVImport && (
+            <CSVImport
+              onClose={() => setShowCSVImport(false)}
+              onImportComplete={() => {
+                setShowCSVImport(false);
+                toast.success('Patients imported successfully!');
+              }}
+              defaultBranch={user?.branch || 'Kajang'}
+              currentUser={user!}
+              availableSystemTags={availableSystemTags}
+            />
+          )}
         </main>
 
         {isFormOpen && (

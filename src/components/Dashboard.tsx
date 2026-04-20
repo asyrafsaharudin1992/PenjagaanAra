@@ -21,6 +21,8 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { getCountFromServer, collection } from 'firebase/firestore';
+import { db } from '../firebase';
 import { FollowUpCase, DashboardStats } from '../types';
 import { cn } from '../lib/utils';
 
@@ -39,7 +41,20 @@ const BAR_COLORS = ['#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#ec4
 const BAR_COLORS_LIGHT = ['#a5b4fc', '#fda4af', '#6ee7b7', '#fcd34d', '#c4b5fd', '#f9a8d4'];
 
 export default function Dashboard({ cases, userName, onFilterByTag }: DashboardProps) {
+  const [totalDatabaseCases, setTotalDatabaseCases] = useState<number | null>(null);
 
+  React.useEffect(() => {
+    async function fetchTotalCount() {
+      try {
+        const coll = collection(db, 'cases');
+        const snapshot = await getCountFromServer(coll);
+        setTotalDatabaseCases(snapshot.data().count);
+      } catch (error) {
+        console.error("Error fetching total count:", error);
+      }
+    }
+    fetchTotalCount();
+  }, []);
   // ── Derive available years from actual case data ──
   const availableYears = useMemo(() => {
     const years = new Set(cases.map(c => new Date(c.createdAt).getFullYear()));
@@ -121,11 +136,18 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
       {/* Stats Grid — always full data */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard 
-          title="TOTAL CASES" 
-          value={cases.length} 
+          title="PROCESSED CASES" 
+          value={totalDatabaseCases ?? cases.length} 
           icon={ClipboardList} 
+          color="blue" 
+          trend="Actual lifetime total"
+        />
+        <StatCard 
+          title="ACTIVE LIST" 
+          value={cases.length} 
+          icon={TrendingUp} 
           color="indigo" 
-          trend="All active cases"
+          trend="Current viewing window"
         />
         {allSortedTags.map(([tag, count]) => (
           <StatCard 

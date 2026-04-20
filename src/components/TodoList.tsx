@@ -109,7 +109,7 @@ export default function TodoList({ user }: TodoListProps) {
         ...doc.data(),
         id: doc.id
       })) as BranchNote[];
-      setBranchNotes(data);
+      setBranchNotes(data?.filter(Boolean) || []);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'branch_notes');
     });
@@ -145,7 +145,7 @@ export default function TodoList({ user }: TodoListProps) {
         ...doc.data(),
         id: doc.id
       })) as TodoItem[];
-      setTodos(data);
+      setTodos(data?.filter(Boolean) || []);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'todo');
@@ -339,15 +339,15 @@ export default function TodoList({ user }: TodoListProps) {
 
                 return (
                   <div 
-                    key={todo.id}
+                    key={todo?.id}
                     className={cn(
                       "bg-white p-5 rounded-3xl border transition-all shadow-sm hover:shadow-lg relative overflow-hidden group",
-                      todo.status === 'completed' ? "border-slate-100 opacity-75" : "border-slate-200",
-                      isAlert && todo.status !== 'completed' && "border-red-200 ring-2 ring-red-50"
+                      todo?.status === 'completed' ? "border-slate-100 opacity-75" : "border-slate-200",
+                      isAlert && todo?.status !== 'completed' && "border-red-200 ring-2 ring-red-50"
                     )}
                   >
                     {/* Reminder Alert Badge */}
-                    {isAlert && todo.status !== 'completed' && (
+                    {isAlert && todo?.status !== 'completed' && (
                       <div className="absolute top-0 right-0 px-3 py-1 bg-red-500 text-white text-[10px] font-bold rounded-bl-xl flex items-center gap-1 shadow-sm">
                         <Bell className="w-3 h-3 animate-bounce" />
                         {status?.toUpperCase()} REMINDER
@@ -357,15 +357,15 @@ export default function TodoList({ user }: TodoListProps) {
                     <div className="flex justify-between items-start mb-4">
                       <div className={cn(
                         "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5",
-                        todo.status === 'completed' ? "bg-slate-100 text-slate-500" : "bg-indigo-50 text-indigo-700"
+                        todo?.status === 'completed' ? "bg-slate-100 text-slate-500" : "bg-indigo-50 text-indigo-700"
                       )}>
-                        {todo.status === 'completed' ? <CheckCircle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                        {todo.status}
+                        {todo?.status === 'completed' ? <CheckCircle className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                        {todo?.status}
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => {
-                            setReminderTodoId(todo.id);
+                            setReminderTodoId(todo?.id);
                             setShowReminderModal(true);
                           }}
                           title="Add Reminder"
@@ -380,7 +380,7 @@ export default function TodoList({ user }: TodoListProps) {
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(todo.id)}
+                          onClick={() => handleDelete(todo?.id)}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -391,45 +391,45 @@ export default function TodoList({ user }: TodoListProps) {
                     <div className="space-y-4">
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Patient Name</p>
-                        <p className="text-base font-bold text-slate-900 leading-tight">{todo.patientName}</p>
+                        <p className="text-base font-bold text-slate-900 leading-tight">{todo?.patientName || 'Unnamed Patient'}</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Visit Date</p>
-                          <p className="text-sm font-semibold text-slate-700">{todo.visitDate || '-'}</p>
+                          <p className="text-sm font-semibold text-slate-700">{todo?.visitDate || '-'}</p>
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Suggested Date</p>
-                          <p className="text-sm font-semibold text-slate-700">{todo.date}</p>
+                          <p className="text-sm font-semibold text-slate-700">{todo?.date || '-'}</p>
                         </div>
                       </div>
 
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Branch & Doctor</p>
                         <div className="flex items-center gap-2 group/info">
-                          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{todo.branch}</span>
-                          <span className="text-xs font-medium text-slate-500">Dr. {todo.doctorName}</span>
+                          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{todo?.branch || '-'}</span>
+                          <span className="text-xs font-medium text-slate-500">Dr. {todo?.doctorName || '-'}</span>
                         </div>
                       </div>
 
                       <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
                         <div className="flex items-start gap-2">
                           <MessageSquare className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
-                          <p className="text-sm text-slate-600 leading-relaxed italic line-clamp-2">"{todo.reason}"</p>
+                          <p className="text-sm text-slate-600 leading-relaxed italic line-clamp-2">"{todo?.reason || 'No reason provided'}"</p>
                         </div>
                       </div>
 
                       {/* Reminders List */}
-                      {todo.reminders && todo.reminders.length > 0 && (
+                      {todo?.reminders && todo.reminders.length > 0 && (
                         <div className="space-y-2 mt-4">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Reminders</p>
                           {todo.reminders.map((r) => (
-                            <div key={r.id} className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 flex items-start gap-3">
+                            <div key={r?.id} className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 flex items-start gap-3">
                               <Bell className="w-3.5 h-3.5 text-indigo-500 mt-0.5" />
                               <div>
-                                <p className="text-xs font-bold text-indigo-900">{r.text}</p>
-                                <p className="text-[10px] text-indigo-600 font-medium">Due: {new Date(r.date).toLocaleDateString()}</p>
+                                <p className="text-xs font-bold text-indigo-900">{r?.text || 'Reminder'}</p>
+                                <p className="text-[10px] text-indigo-600 font-medium">Due: {r?.date ? new Date(r.date).toLocaleDateString() : '-'}</p>
                               </div>
                             </div>
                           ))}
@@ -439,15 +439,15 @@ export default function TodoList({ user }: TodoListProps) {
 
                     <div className="mt-6">
                       <button 
-                        onClick={() => toggleStatus(todo.id, todo.status)}
+                        onClick={() => toggleStatus(todo?.id, todo?.status)}
                         className={cn(
                           "w-full py-3 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 tracking-widest uppercase",
-                          todo.status === 'completed' 
+                          todo?.status === 'completed' 
                             ? "bg-slate-100 text-slate-400 hover:bg-slate-200" 
                             : "bg-slate-900 text-white hover:bg-black shadow-lg shadow-slate-200 active:scale-95"
                         )}
                       >
-                        {todo.status === 'completed' ? "REOPEN TASK" : "MARK DONE"}
+                        {todo?.status === 'completed' ? "REOPEN TASK" : "MARK DONE"}
                       </button>
                     </div>
                   </div>
