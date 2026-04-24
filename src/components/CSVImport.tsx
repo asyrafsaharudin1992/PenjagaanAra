@@ -306,6 +306,8 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
             phone: String(patient.patientPhone || '').replace(/\s+/g, ''),
             branch: (patient.branch as ClinicBranch) || selectedBranch,
             tag: selectedTag,
+            lastVisitDate: patient.lastVisitDate || '',
+            appointmentDate: patient.appointmentDate || '',
             createdAt: new Date().toISOString(),
             createdByEmail: currentUser?.email || '',
             createdByUid: currentUser?.uid || '',

@@ -31,6 +31,8 @@ export interface Patient {
   dateOfBirth?: string;
   branch: ClinicBranch;
   tag: string;
+  lastVisitDate?: string;
+  appointmentDate?: string;
   createdAt: string;
   createdByEmail?: string;
   createdByUid?: string;

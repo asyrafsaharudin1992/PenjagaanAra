@@ -107,6 +107,8 @@ export default function CaseDetails({
   const [editedTag, setEditedTag] = useState(caseData.followUpTag);
   const [editedBranch, setEditedBranch] = useState(caseData.branch || 'Kajang');
   const [editedDoctorInCharge, setEditedDoctorInCharge] = useState(caseData.doctorInCharge || '');
+  const [editedAppointmentDate, setEditedAppointmentDate] = useState(caseData.appointmentDate || '');
+  const [editedLastVisitDate, setEditedLastVisitDate] = useState(caseData.lastVisitDate || '');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // --- ADDED: ANC and NCD field state ---
@@ -296,7 +298,9 @@ export default function CaseDetails({
         remarks: editedRemarks,
         diagnosis: editedDiagnosis,
         branch: editedBranch as ClinicBranch,
-        doctorInCharge: editedDoctorInCharge
+        doctorInCharge: editedDoctorInCharge,
+        appointmentDate: editedAppointmentDate,
+        lastVisitDate: editedLastVisitDate
       };
 
       if (editedRemarks !== caseData.remarks) {
@@ -501,8 +505,13 @@ export default function CaseDetails({
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Appointment Date</p>
-                <p className="text-sm font-bold text-indigo-600">{caseData.appointmentDate ? new Date(caseData.appointmentDate).toLocaleDateString() : '-'}</p>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Appointment Date</p>
+                <input 
+                  type="date"
+                  value={editedAppointmentDate}
+                  onChange={(e) => setEditedAppointmentDate(e.target.value)}
+                  className="text-sm font-bold text-indigo-600 bg-white border border-slate-200 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
               </div>
             </div>
 
@@ -518,8 +527,13 @@ export default function CaseDetails({
                 />
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Last Visit</p>
-                <p className="text-sm font-medium text-slate-700">{caseData.lastVisitDate ? new Date(caseData.lastVisitDate).toLocaleDateString() : 'N/A'}</p>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Last Visit</p>
+                <input 
+                  type="date"
+                  value={editedLastVisitDate}
+                  onChange={(e) => setEditedLastVisitDate(e.target.value)}
+                  className="w-full text-sm font-medium text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
               </div>
             </div>
           </div>
