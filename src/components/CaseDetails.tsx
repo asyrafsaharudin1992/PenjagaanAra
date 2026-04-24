@@ -107,6 +107,7 @@ export default function CaseDetails({
   const [editedTag, setEditedTag] = useState(caseData.followUpTag);
   const [editedBranch, setEditedBranch] = useState(caseData.branch || 'Kajang');
   const [editedDoctorInCharge, setEditedDoctorInCharge] = useState(caseData.doctorInCharge || '');
+  const [editedFollowUpDoneBy, setEditedFollowUpDoneBy] = useState(caseData.followUpDoneBy || '');
   const [editedAppointmentDate, setEditedAppointmentDate] = useState(caseData.appointmentDate || '');
   const [editedLastVisitDate, setEditedLastVisitDate] = useState(caseData.lastVisitDate || '');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
@@ -299,6 +300,7 @@ export default function CaseDetails({
         diagnosis: editedDiagnosis,
         branch: editedBranch as ClinicBranch,
         doctorInCharge: editedDoctorInCharge,
+        followUpDoneBy: editedFollowUpDoneBy,
         appointmentDate: editedAppointmentDate,
         lastVisitDate: editedLastVisitDate
       };
@@ -803,11 +805,17 @@ export default function CaseDetails({
 
             <div className="space-y-3">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Follow up done by</label>
-              <div className="bg-white border border-slate-200 px-4 py-3 rounded-xl flex items-center gap-3">
+              <div className="bg-white border border-slate-200 px-4 py-2 rounded-xl flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
                   <User className="w-4 h-4" />
                 </div>
-                <p className="text-sm font-medium text-slate-700">{caseData.followUpDoneBy || 'Not specified'}</p>
+                <input 
+                  type="text"
+                  value={editedFollowUpDoneBy}
+                  onChange={(e) => setEditedFollowUpDoneBy(e.target.value)}
+                  className="flex-1 text-sm font-medium text-slate-700 bg-transparent border-none focus:ring-0 outline-none p-0"
+                  placeholder="Enter staff name..."
+                />
               </div>
             </div>
 

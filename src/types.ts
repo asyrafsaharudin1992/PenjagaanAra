@@ -33,6 +33,9 @@ export interface Patient {
   tag: string;
   lastVisitDate?: string;
   appointmentDate?: string;
+  followUpDoneBy?: string;
+  diagnosis?: string;
+  doctorInCharge?: string;
   createdAt: string;
   createdByEmail?: string;
   createdByUid?: string;

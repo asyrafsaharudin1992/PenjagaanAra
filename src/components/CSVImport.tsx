@@ -15,6 +15,7 @@ interface ImportedPatient {
   doctorInCharge?: string;
   lastVisitDate?: string;
   appointmentDate?: string;
+  followUpDoneBy?: string;
   followUpTag?: string;
   remarks?: string;
   isValid: boolean;
@@ -32,6 +33,7 @@ interface ColumnMapping {
   branch: string | null;
   lastVisitDate: string | null;
   appointmentDate: string | null;
+  followUpDoneBy: string | null;
   followUpTag: string | null;
   remarks: string | null;
 }
@@ -57,6 +59,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
     branch: null,
     lastVisitDate: null,
     appointmentDate: null,
+    followUpDoneBy: null,
     followUpTag: null,
     remarks: null,
   });
@@ -146,6 +149,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
       branch: null,
       lastVisitDate: null,
       appointmentDate: null,
+      followUpDoneBy: null,
       followUpTag: null,
       remarks: null,
     };
@@ -169,6 +173,8 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
         mapping.lastVisitDate = header;
       } else if (lower.includes('appointment') || lower.includes('next')) {
         mapping.appointmentDate = header;
+      } else if (lower.includes('staff') || lower.includes('done by') || lower.includes('followupdonby') || lower.includes('staffname')) {
+        mapping.followUpDoneBy = header;
       } else if (lower.includes('tag') || lower.includes('category')) {
         mapping.followUpTag = header;
       } else if (lower.includes('remark') || lower.includes('note')) {
@@ -212,6 +218,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
             : selectedBranch,
           lastVisitDate: columnMapping.lastVisitDate ? row[columnMapping.lastVisitDate] : '',
           appointmentDate: columnMapping.appointmentDate ? row[columnMapping.appointmentDate] : '',
+          followUpDoneBy: columnMapping.followUpDoneBy ? row[columnMapping.followUpDoneBy] : '',
           followUpTag: columnMapping.followUpTag ? row[columnMapping.followUpTag] : 'others',
           remarks: columnMapping.remarks ? row[columnMapping.remarks] : 'Imported from CSV - pending details',
           rawData: row,
@@ -308,6 +315,9 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
             tag: selectedTag,
             lastVisitDate: patient.lastVisitDate || '',
             appointmentDate: patient.appointmentDate || '',
+            followUpDoneBy: patient.followUpDoneBy || '',
+            diagnosis: patient.diagnosis || '',
+            doctorInCharge: patient.doctorInCharge || '',
             createdAt: new Date().toISOString(),
             createdByEmail: currentUser?.email || '',
             createdByUid: currentUser?.uid || '',
@@ -521,6 +531,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
                   <ColumnMappingSelector field="doctorInCharge" label="Doctor (default: 'To be assigned')" required={false} />
                   <ColumnMappingSelector field="lastVisitDate" label="Last Visit Date" required={false} />
                   <ColumnMappingSelector field="appointmentDate" label="Appointment Date" required={false} />
+                  <ColumnMappingSelector field="followUpDoneBy" label="Staff (Follow up done by)" required={false} />
                   <ColumnMappingSelector field="remarks" label="Remarks/Notes" required={false} />
                 </div>
               </div>
