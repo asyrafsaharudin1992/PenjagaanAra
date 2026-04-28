@@ -16,3 +16,14 @@ export function normalizeBranch(branch?: string): string | undefined {
   if (b === 'SK' || b === 'SERI KEMBANGAN') return 'Seri Kembangan';
   return branch;
 }
+
+export function normalizeTag(tag: string): string {
+  if (!tag) return 'Others';
+  const t = tag.toLowerCase().trim();
+  if (t === 'aramommy' || t.includes('mommy')) return 'AraMommy';
+  if (t === 'arachronic' || t.includes('chronic')) return 'AraChronic';
+  if (t === 'arawellness' || t.includes('wellness') || t.includes('weight loss')) return 'AraWellness';
+  if (t === 'referral' || t.includes('referral cases')) return 'Referral';
+  if (t === 'others') return 'Others';
+  return tag.trim();
+}

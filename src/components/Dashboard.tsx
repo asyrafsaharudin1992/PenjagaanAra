@@ -24,7 +24,7 @@ import {
 import { getCountFromServer, collection } from 'firebase/firestore';
 import { db } from '../firebase';
 import { FollowUpCase, DashboardStats } from '../types';
-import { cn } from '../lib/utils';
+import { cn, normalizeTag } from '../lib/utils';
 
 interface DashboardProps {
   cases: FollowUpCase[];
@@ -99,7 +99,7 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
 
   const chartData = sortedTags
     .map(([name, data]) => ({ name, ...data.branches, total: data.total }))
-    .slice(0, 6);
+    .slice(0, 10);
 
   // ── Stats always based on full (unfiltered) cases ──
   const allTagCounts = useMemo(() => {
@@ -338,26 +338,21 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function normalizeTag(tag: string): string {
-  const t = tag.toLowerCase().trim();
-  if (t === 'aramommy') return 'AraMommy';
-  if (t === 'arachronic') return 'AraChronic';
-  if (t.includes('arawellness')) return 'AraWellness';
-  if (t.includes('referral')) return 'Referral';
-  return tag;
-}
-
 function getTagColor(tag: string): string {
-  if (tag === 'AraMommy') return 'pink';
-  if (tag === 'AraWellness' || tag.includes('wellness')) return 'emerald';
-  if (tag === 'Referral') return 'indigo';
+  const t = normalizeTag(tag);
+  if (t === 'AraMommy') return 'pink';
+  if (t === 'AraWellness') return 'emerald';
+  if (t === 'AraChronic') return 'blue';
+  if (t === 'Referral') return 'indigo';
   return 'slate';
 }
 
 function getTagIcon(tag: string) {
-  if (tag === 'AraMommy') return Users;
-  if (tag === 'AraWellness' || tag.includes('wellness')) return TrendingUp;
-  if (tag === 'Referral') return AlertCircle;
+  const t = normalizeTag(tag);
+  if (t === 'AraMommy') return Users;
+  if (t === 'AraWellness') return TrendingUp;
+  if (t === 'Referral') return AlertCircle;
+  if (t === 'AraChronic') return ClipboardList;
   return CheckCircle2;
 }
 

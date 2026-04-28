@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Loader2, AlertCircle, Baby, Stethoscope } from 'lucide-react';
 import { FollowUpCase, FollowUpTag, ClinicBranch, UserProfile } from '../types';
 import { suggestUrgency } from '../services/gemini';
-import { cn, normalizeBranch } from '../lib/utils';
+import { cn, normalizeBranch, normalizeTag } from '../lib/utils';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
@@ -57,7 +57,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
     doctorInCharge: '',
     remarks: '',
     followUpDoneBy: '',
-    followUpTag: 'others' as FollowUpTag,
+    followUpTag: 'Others' as FollowUpTag,
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isNewPatient, setIsNewPatient] = useState(false);
@@ -75,7 +75,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
 
   // Fetch tags dynamically with error handling - MERGE with defaults
   useEffect(() => {
-    const defaultTags = ['AraMommy', 'AraChronic', 'AraWellness (weight loss)', 'Referral', 'others'];
+    const defaultTags = ['AraMommy', 'AraChronic', 'AraWellness', 'Referral', 'Others'];
     
     try {
       // Try to fetch from Firestore, but don't use orderBy to avoid index requirement
@@ -85,22 +85,30 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
         (snapshot) => {
           const firestoreTags = snapshot.docs.map(doc => doc.data().name as string);
           
-          // MERGE Firestore tags with default tags (remove duplicates)
-          const allTags = [...new Set([...defaultTags, ...firestoreTags])];
+          // MERGE Firestore tags with default tags (remove duplicates using normalization)
+          const distinctNormalized = new Set<string>();
+          const result: string[] = [];
+
+          [...defaultTags, ...firestoreTags].forEach(tag => {
+            const normalized = normalizeTag(tag);
+            if (!distinctNormalized.has(normalized)) {
+              distinctNormalized.add(normalized);
+              result.push(normalized);
+            }
+          });
           
-          // Sort tags alphabetically in memory instead of Firestore
-          const sortedTags = allTags.sort((a, b) => a.localeCompare(b));
+          // Sort tags alphabetically
+          const sortedTags = result.sort((a, b) => a.localeCompare(b));
           setAvailableTags(sortedTags);
         },
         (error) => {
-          // If Firestore fails, use default tags only
+          // If Firestore fails, use default tags
           console.error('Error fetching tags from Firestore:', error);
           setAvailableTags(defaultTags);
         }
       );
       return () => unsubscribe();
     } catch (error) {
-      // If query setup fails, use default tags only
       console.error('Error setting up tags query:', error);
       setAvailableTags(defaultTags);
     }
@@ -413,7 +421,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         if (newTagValue.trim()) {
-                          setFormData({...formData, followUpTag: newTagValue.trim()});
+                          setFormData({...formData, followUpTag: normalizeTag(newTagValue.trim())});
                           setShowNewTagInput(false);
                           setNewTagValue('');
                         }
@@ -424,7 +432,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
                     type="button"
                     onClick={() => {
                       if (newTagValue.trim()) {
-                        setFormData({...formData, followUpTag: newTagValue.trim()});
+                        setFormData({...formData, followUpTag: normalizeTag(newTagValue.trim())});
                         setShowNewTagInput(false);
                         setNewTagValue('');
                       }
@@ -463,7 +471,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
               rows={2}
               value={formData.diagnosis}
               onChange={e => setFormData({...formData, diagnosis: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all"
               placeholder="Enter patient diagnosis..."
             />
           </div>
@@ -631,7 +639,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
               rows={2}
               value={formData.remarks}
               onChange={e => setFormData({...formData, remarks: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all shadow-sm"
               placeholder="Additional remarks..."
             />
           </div>
@@ -642,7 +650,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
               type="text"
               value={formData.followUpDoneBy}
               onChange={e => setFormData({...formData, followUpDoneBy: e.target.value})}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-bold transition-all"
               placeholder="Staff Name"
             />
           </div>

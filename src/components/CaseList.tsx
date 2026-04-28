@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FollowUpCase, FollowUpTag, UserPermission, UserProfile, Patient } from '../types';
-import { cn } from '../lib/utils';
+import { cn, normalizeTag } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 
@@ -54,7 +54,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
   const availableTags = useMemo(() => {
     const seen = new Set<string>();
     cases.forEach(c => {
-      if (c.followUpTag) seen.add(canonicalizeTag(c.followUpTag));
+      if (c.followUpTag) seen.add(normalizeTag(c.followUpTag));
     });
     return Array.from(seen).sort((a, b) => a.localeCompare(b));
   }, [cases]);
@@ -770,37 +770,10 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
   );
 }
 
-// Collapses all known tag variants into one canonical display name so the
-// dropdown shows each logical tag exactly once regardless of how it was typed.
-function canonicalizeTag(tag: string): string {
-  const t = (tag || '').toLowerCase().trim();
-  if (t === 'aramommy')             return 'AraMommy';
-  if (t === 'arachronic')           return 'AraChronic';
-  if (t.includes('arawellness'))    return 'AraWellness (weight loss)';
-  if (t.includes('referral'))       return 'Referral';
-  if (t === 'others')               return 'Others';
-  // Unknown tags: keep original but trimmed
-  return tag.trim();
-}
-
-function TagBadge({ tag }: { tag: FollowUpTag }) {
-  const normalizedTag = (tag || '').toLowerCase().trim();
-  let styleKey = normalizedTag;
-  let displayTag = tag || 'Unknown';
-
-  if (normalizedTag.includes('referral')) {
-    styleKey = 'referral';
-    displayTag = 'Referral';
-  } else if (normalizedTag.includes('arawellness')) {
-    styleKey = 'arawellness';
-    displayTag = 'AraWellness';
-  } else if (normalizedTag === 'aramommy') {
-    styleKey = 'aramommy';
-    displayTag = 'AraMommy';
-  } else if (normalizedTag === 'arachronic') {
-    styleKey = 'arachronic';
-    displayTag = 'AraChronic';
-  }
+function TagBadge({ tag }: { tag: string }) {
+  const t = normalizeTag(tag);
+  let styleKey = t.toLowerCase();
+  let displayTag = t;
 
   const styles: Record<string, string> = {
     'aramommy': "bg-pink-50 text-pink-700 border-pink-100",

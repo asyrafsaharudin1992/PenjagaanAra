@@ -386,11 +386,12 @@ export default function App() {
   // Derive tags from current cases list efficiently
   const availableSystemTags = React.useMemo(() => {
     const normalizeTag = (tag: string): string => {
+      if (!tag) return 'Others';
       const t = tag.toLowerCase().trim();
-      if (t === 'aramommy') return 'AraMommy';
-      if (t === 'arachronic') return 'AraChronic';
-      if (t.includes('arawellness')) return 'AraWellness';
-      if (t.includes('referral')) return 'Referral';
+      if (t === 'aramommy' || t.includes('mommy')) return 'AraMommy';
+      if (t === 'arachronic' || t.includes('chronic')) return 'AraChronic';
+      if (t === 'arawellness' || t.includes('wellness') || t.includes('weight loss')) return 'AraWellness';
+      if (t === 'referral' || t.includes('referral cases')) return 'Referral';
       return tag.trim();
     };
     
@@ -399,7 +400,7 @@ export default function App() {
       if (c.followUpTag) seen.add(normalizeTag(c.followUpTag));
     });
     // Add default fallbacks if not present
-    ['Referral', 'AraMommy', 'AraWellness', 'AraChronic', 'Routine', 'Follow-up'].forEach(t => seen.add(t));
+    ['Referral', 'AraMommy', 'AraWellness', 'AraChronic', 'Routine', 'Follow-up', 'Others'].forEach(t => seen.add(t));
     return Array.from(seen).sort();
   }, [cases]);
 

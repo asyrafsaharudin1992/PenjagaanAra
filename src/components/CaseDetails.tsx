@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { FollowUpCase, FollowUpTag, UserRole, UserPermission, ClinicBranch, Patient, UserProfile } from '../types';
 import { summarizeCase } from '../services/gemini';
-import { cn } from '../lib/utils';
+import { cn, normalizeTag } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { deleteDoc, doc, collection, query, where, onSnapshot, orderBy, getDocs, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -112,6 +112,18 @@ export default function CaseDetails({
   const [editedLastVisitDate, setEditedLastVisitDate] = useState(caseData.lastVisitDate || '');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
+  // Reset states when caseId changes (handles cases where component stays mounted)
+  useEffect(() => {
+    setEditedRemarks(caseData.remarks || '');
+    setEditedDiagnosis(caseData.diagnosis || '');
+    setEditedTag(caseData.followUpTag);
+    setEditedBranch(caseData.branch || 'Kajang');
+    setEditedDoctorInCharge(caseData.doctorInCharge || '');
+    setEditedFollowUpDoneBy(caseData.followUpDoneBy || '');
+    setEditedAppointmentDate(caseData.appointmentDate || '');
+    setEditedLastVisitDate(caseData.lastVisitDate || '');
+  }, [caseData.id]);
+
   // --- ADDED: ANC and NCD field state ---
   const [ancFields, setAncFields] = useState<ANCFields>(defaultANCFields);
   const [ncdFields, setNcdFields] = useState<NCDFields>(defaultNCDFields);
@@ -119,15 +131,28 @@ export default function CaseDetails({
 
   // Fetch tags dynamically
   useEffect(() => {
-    const q = query(collection(db, 'tags'), orderBy('name', 'asc'));
+    const defaultTags = ['AraMommy', 'AraChronic', 'AraWellness', 'Referral', 'Others'];
+    
+    const q = query(collection(db, 'tags'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const tags = snapshot.docs.map(doc => doc.data().name as string);
-      if (tags.length === 0) {
-        const initialTags = ['AraMommy', 'AraChronic', 'AraWellness (weight loss)', 'Referral', 'others'];
-        setAvailableTags(initialTags);
-      } else {
-        setAvailableTags(tags);
-      }
+      const firestoreTags = snapshot.docs.map(doc => doc.data().name as string);
+      
+      const distinctNormalized = new Set<string>();
+      const result: string[] = [];
+
+      [...defaultTags, ...firestoreTags].forEach(tag => {
+        const normalized = normalizeTag(tag);
+        if (!distinctNormalized.has(normalized)) {
+          distinctNormalized.add(normalized);
+          result.push(normalized);
+        }
+      });
+      
+      const sortedTags = result.sort((a, b) => a.localeCompare(b));
+      setAvailableTags(sortedTags);
+    }, (error) => {
+      console.error('Error fetching tags:', error);
+      setAvailableTags(defaultTags);
     });
     return () => unsubscribe();
   }, []);
@@ -194,7 +219,6 @@ export default function CaseDetails({
     return () => unsubscribe();
   }, [caseData.id, caseData.followUpTag]);
 
-  const defaultTags = ['aramommy', 'arachronic', 'arawellness (weight loss)', 'referral', 'others'];
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const canDelete = userPermissions.includes('delete_case');
@@ -602,7 +626,7 @@ export default function CaseDetails({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         if (newTagValue.trim()) {
-                          handleStatusChange(newTagValue.trim());
+                          handleStatusChange(normalizeTag(newTagValue.trim()));
                           setNewTagValue('');
                           setShowNewTagInput(false);
                         }
@@ -612,7 +636,7 @@ export default function CaseDetails({
                   <button 
                     onClick={() => {
                       if (newTagValue.trim()) {
-                        handleStatusChange(newTagValue.trim());
+                        handleStatusChange(normalizeTag(newTagValue.trim()));
                         setNewTagValue('');
                         setShowNewTagInput(false);
                       }
@@ -632,7 +656,7 @@ export default function CaseDetails({
             <textarea 
               value={editedDiagnosis}
               onChange={(e) => setEditedDiagnosis(e.target.value)}
-              className="w-full text-sm text-slate-700 leading-relaxed bg-white border border-slate-200 p-4 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[100px] resize-none"
+              className="w-full text-sm text-slate-700 leading-relaxed bg-white border border-slate-300 p-4 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 min-h-[100px] resize-none transition-all"
               placeholder="Enter diagnosis..."
             />
           </div>
@@ -798,14 +822,14 @@ export default function CaseDetails({
               <textarea 
                 value={editedRemarks}
                 onChange={(e) => setEditedRemarks(e.target.value)}
-                className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 min-h-[100px] text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                className="w-full bg-white p-4 rounded-xl border border-slate-300 min-h-[100px] text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 resize-none transition-all shadow-sm"
                 placeholder="Enter remarks..."
               />
             </div>
 
             <div className="space-y-3">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Follow up done by</label>
-              <div className="bg-white border border-slate-200 px-4 py-2 rounded-xl flex items-center gap-3">
+              <div className="bg-white border border-slate-300 px-4 py-2 rounded-xl flex items-center gap-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-600 transition-all shadow-sm">
                 <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
                   <User className="w-4 h-4" />
                 </div>
@@ -813,7 +837,7 @@ export default function CaseDetails({
                   type="text"
                   value={editedFollowUpDoneBy}
                   onChange={(e) => setEditedFollowUpDoneBy(e.target.value)}
-                  className="flex-1 text-sm font-medium text-slate-700 bg-transparent border-none focus:ring-0 outline-none p-0"
+                  className="flex-1 text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 outline-none p-0"
                   placeholder="Enter staff name..."
                 />
               </div>
