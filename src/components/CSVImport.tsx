@@ -103,40 +103,95 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
   }, [availableSystemTags]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    try {
+      console.log("File selected for upload trigger initialized.");
+      const file = e.target.files?.[0];
+      if (!file) {
+        console.log("No file selected, returning.");
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      parseCSVHeaders(text);
-    };
-    reader.readAsText(file);
+      console.log(`File selected: ${file.name}, Size: ${file.size} bytes`);
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        try {
+          const text = event.target?.result as string;
+          if (!text) {
+            throw new Error("File content is empty or resulted in null state.");
+          }
+          console.log("File read successfully, parsing started.");
+          parseCSVHeaders(text);
+        } catch (err) {
+          console.error("Error during file onload:", err);
+          toast.error("Failed to read the file content. Ensure it's a valid CSV.");
+        }
+      };
+
+      reader.onerror = (error) => {
+        console.error("FileReader error:", error);
+        toast.error("Error reading file.");
+      };
+
+      reader.readAsText(file);
+    } catch (globalError) {
+      console.error("Critical error in handleFileUpload:", globalError);
+      toast.error("Failed to initialize file upload process.");
+    }
   };
 
   const parseCSVHeaders = (text: string) => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length < 2) {
-      toast.error('CSV file is empty or invalid');
-      return;
-    }
+    try {
+      // Basic quoted CSV parser to avoid comma splitting errors inside quotes
+      const parseRow = (row: string) => {
+        const result = [];
+        let inQuotes = false;
+        let current = "";
+        for (let i = 0; i < row.length; i++) {
+          const char = row[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = "";
+          } else {
+            current += char;
+          }
+        }
+        result.push(current);
+        return result.map(s => s.replace(/^"|"$/g, '').trim()); // Strip start/end quotes
+      };
 
-    const headers = lines[0].split(',').map(h => h.trim());
-    setCsvHeaders(headers);
+      const lines = text.split(/\r?\n/).filter(line => line.trim());
+      if (lines.length < 2) {
+        throw new Error(`CSV file has only ${lines.length} valid lines, missing data.`);
+      }
 
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
-      const row: any = {};
-      headers.forEach((header, idx) => {
-        row[header] = values[idx] || '';
-      });
-      rows.push(row);
+      const headers = parseRow(lines[0]);
+      console.log("Parsed CSV Headers:", headers);
+      setCsvHeaders(headers);
+
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseRow(lines[i]);
+        if (values.length === 0 || (values.length === 1 && !values[0])) continue; // skip totally empty rows
+        
+        const row: any = {};
+        headers.forEach((header, idx) => {
+          row[header] = values[idx] || '';
+        });
+        rows.push(row);
+      }
+      
+      console.log(`Parsed ${rows.length} rows successfully.`);
+      setCsvData(rows);
+      autoDetectMapping(headers);
+      setStep('mapping');
+      toast.success(`Loaded ${rows.length} rows from CSV`);
+    } catch (parseError: any) {
+      console.error("Error during CSV parsing:", parseError);
+      toast.error(`CSV Parsing Error: ${parseError.message || "Invalid format"}`);
     }
-    setCsvData(rows);
-    autoDetectMapping(headers);
-    setStep('mapping');
-    toast.success(`Loaded ${rows.length} rows from CSV`);
   };
 
   const autoDetectMapping = (headers: string[]) => {
@@ -281,51 +336,70 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
   };
 
   const handleImportPatients = async () => {
-    const selectedPatients = Array.from(selectedRows).map(idx => importedData[idx]);
-    const validPatients = selectedPatients.filter(p => p.isValid);
-    const invalidCount = selectedPatients.length - validPatients.length;
-
-    if (validPatients.length === 0) {
-      toast.error('No valid patients to import.');
-      return;
-    }
-
-    if (invalidCount > 0) {
-      toast.warning(`${invalidCount} patient(s) skipped due to missing fields.`);
-    }
-
-    setIsProcessing(true);
-
     try {
+      console.log("Starting import process...");
+      console.log("Total rows available:", importedData.length);
+      console.log("Selected indices:", Array.from(selectedRows));
+
+      // Guard: Ensure we only process selected rows that are valid
+      const validSelectedIndices = Array.from(selectedRows).filter(idx => {
+        const patient = importedData[idx];
+        return patient && patient.isValid;
+      });
+
+      if (validSelectedIndices.length === 0) {
+        toast.error('No valid and selected patients to import.');
+        return;
+      }
+
+      const validPatients = validSelectedIndices.map(idx => importedData[idx]);
+      console.log(`Filtered down to ${validPatients.length} valid, selected patients.`);
+
+      const invalidCount = selectedRows.size - validSelectedIndices.length;
+      if (invalidCount > 0) {
+        toast.warning(`${invalidCount} selected patient(s) skipped due to missing required fields.`);
+      }
+
+      setIsProcessing(true);
       let successCount = 0;
       let errorCount = 0;
 
       // Force a quick re-verification or retrieval of the current user's session token 
       // to ensure the active connection does not drop or time out while processing large amounts of data.
-      if (auth.currentUser) {
-        try {
+      try {
+        if (auth.currentUser) {
+          console.log("Refreshing auth token to prevent expiration during large batch...");
           await auth.currentUser.getIdToken(true);
-        } catch (err) {
-          console.warn('Failed to refresh token before import, proceeding anyway...', err);
+        } else {
+          console.warn("No authenticated user found before import. Database rules might deny writes.");
         }
+      } catch (err) {
+        console.error("Token refresh failed, proceeding anyway:", err);
       }
 
       // 1. Implement Smart Chunking (Batch Splitting)
-      // 2. Optimize Write Operations (currently 1 write per patient, limit to 50 for safety)
+      // 2. Optimize Write Operations (limit to 50 for safety so total mutations stay well under 500)
       const MAX_BATCH_SIZE = 50;
+      console.log(`Starting chunking process. Chunk Size: ${MAX_BATCH_SIZE}`);
 
       // Loop through these chunks sequentially
       for (let i = 0; i < validPatients.length; i += MAX_BATCH_SIZE) {
+        console.log(`Processing chunk range: [${i} to ${i + MAX_BATCH_SIZE - 1}]`);
         const chunk = validPatients.slice(i, i + MAX_BATCH_SIZE);
-        const batch = writeBatch(db);
-        let chunkCount = 0;
+        
+        try {
+          const batch = writeBatch(db);
+          let chunkCount = 0;
 
-        for (const patient of chunk) {
-          try {
+          for (const patient of chunk) {
             const patientRef = doc(collection(db, 'patients'));
+            
+            // Generate a more unique Patient ID in case they share the exact millisecond locally
+            const uniqueBackupId = `P-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+            
             const patientData = {
               id: patientRef.id,
-              patientId: String(patient.patientId || `P-${Date.now()}`),
+              patientId: String(patient.patientId || uniqueBackupId),
               name: String(patient.patientName || 'Unknown'),
               phone: String(patient.patientPhone || '').replace(/\s+/g, ''),
               branch: (patient.branch as ClinicBranch) || selectedBranch,
@@ -342,23 +416,22 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
 
             batch.set(patientRef, patientData);
             chunkCount++;
-          } catch (error) {
-            console.error(`[IMPORT] Local error preparing data for ${patient.patientName}:`, error);
-            errorCount++;
           }
-        }
-        
-        // Wrap the chunking loop in a proper try-catch block
-        try {
+          
+          console.log(`Committing batch with ${chunkCount} operations...`);
           // Resolve it using await batch.commit() before moving to the next chunk
           await batch.commit();
           successCount += chunkCount;
+          console.log(`Batch commit successful. Total success so far: ${successCount}`);
+          
         } catch (batchError) {
-          console.error(`[IMPORT] Batch commit failed for rows ${i} to ${i + chunk.length - 1}:`, batchError);
           // If a specific chunk fails, catch the error gracefully instead of crashing the entire import process.
-          errorCount += chunkCount;
+          console.error(`[IMPORT] Batch commit failed for chunks ${i} to ${i + chunk.length - 1}:`, batchError);
+          errorCount += chunk.length;
         }
       }
+
+      console.log(`Import Loop Complete. Success: ${successCount}, Errors: ${errorCount}`);
 
       // 4. Summary Notification
       if (successCount > 0) {
@@ -369,9 +442,9 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
         toast.error(`All imports failed. Check console for details.`);
       }
       
-    } catch (error) {
-      console.error('[IMPORT] Major Error:', error);
-      toast.error('Failed to import patients');
+    } catch (globalError) {
+      console.error('[IMPORT] Critical Error in handleImportPatients:', globalError);
+      toast.error('A critical error occurred while importing patients. Check console logs.');
     } finally {
       setIsProcessing(false);
     }
