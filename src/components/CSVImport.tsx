@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, X, AlertCircle, CheckCircle, ArrowRight, FileText, Users, Settings, Tag, Building2, AlertTriangle } from 'lucide-react';
-import { db } from '../firebase';
-import { collection, addDoc, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { collection, addDoc, doc, setDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { FollowUpCase, UserProfile, ClinicBranch, FollowUpTag } from '../types';
 import { normalizeBranch, cn } from '../lib/utils';
@@ -300,42 +300,69 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
       let successCount = 0;
       let errorCount = 0;
 
-      for (const patient of validPatients) {
+      // Force a quick re-verification or retrieval of the current user's session token 
+      // to ensure the active connection does not drop or time out while processing large amounts of data.
+      if (auth.currentUser) {
         try {
-          // Check if patient already exists to avoid duplicates (optional but good)
-          // For now, following instructions to simply save to patients collection.
-          
-          const patientRef = doc(collection(db, 'patients'));
-          const patientData = {
-            id: patientRef.id,
-            patientId: String(patient.patientId || `P-${Date.now()}`),
-            name: String(patient.patientName || 'Unknown'),
-            phone: String(patient.patientPhone || '').replace(/\s+/g, ''),
-            branch: (patient.branch as ClinicBranch) || selectedBranch,
-            tag: selectedTag,
-            lastVisitDate: patient.lastVisitDate || '',
-            appointmentDate: patient.appointmentDate || '',
-            followUpDoneBy: patient.followUpDoneBy || '',
-            diagnosis: patient.diagnosis || '',
-            doctorInCharge: patient.doctorInCharge || '',
-            createdAt: new Date().toISOString(),
-            createdByEmail: currentUser?.email || '',
-            createdByUid: currentUser?.uid || '',
-          };
-
-          await setDoc(patientRef, patientData);
-          successCount++;
-        } catch (error) {
-          console.error(`[IMPORT] FAILED for ${patient.patientName}:`, error);
-          errorCount++;
+          await auth.currentUser.getIdToken(true);
+        } catch (err) {
+          console.warn('Failed to refresh token before import, proceeding anyway...', err);
         }
       }
 
-      if (successCount > 0) {
-        toast.success(`Successfully imported ${successCount} patients to Directory!`);
-        if (errorCount > 0) {
-          toast.error(`Failed to import ${errorCount} patients`);
+      // 1. Implement Smart Chunking (Batch Splitting)
+      // 2. Optimize Write Operations (currently 1 write per patient, limit to 50 for safety)
+      const MAX_BATCH_SIZE = 50;
+
+      // Loop through these chunks sequentially
+      for (let i = 0; i < validPatients.length; i += MAX_BATCH_SIZE) {
+        const chunk = validPatients.slice(i, i + MAX_BATCH_SIZE);
+        const batch = writeBatch(db);
+        let chunkCount = 0;
+
+        for (const patient of chunk) {
+          try {
+            const patientRef = doc(collection(db, 'patients'));
+            const patientData = {
+              id: patientRef.id,
+              patientId: String(patient.patientId || `P-${Date.now()}`),
+              name: String(patient.patientName || 'Unknown'),
+              phone: String(patient.patientPhone || '').replace(/\s+/g, ''),
+              branch: (patient.branch as ClinicBranch) || selectedBranch,
+              tag: selectedTag,
+              lastVisitDate: patient.lastVisitDate || '',
+              appointmentDate: patient.appointmentDate || '',
+              followUpDoneBy: patient.followUpDoneBy || '',
+              diagnosis: patient.diagnosis || '',
+              doctorInCharge: patient.doctorInCharge || '',
+              createdAt: new Date().toISOString(),
+              createdByEmail: currentUser?.email || '',
+              createdByUid: currentUser?.uid || '',
+            };
+
+            batch.set(patientRef, patientData);
+            chunkCount++;
+          } catch (error) {
+            console.error(`[IMPORT] Local error preparing data for ${patient.patientName}:`, error);
+            errorCount++;
+          }
         }
+        
+        // Wrap the chunking loop in a proper try-catch block
+        try {
+          // Resolve it using await batch.commit() before moving to the next chunk
+          await batch.commit();
+          successCount += chunkCount;
+        } catch (batchError) {
+          console.error(`[IMPORT] Batch commit failed for rows ${i} to ${i + chunk.length - 1}:`, batchError);
+          // If a specific chunk fails, catch the error gracefully instead of crashing the entire import process.
+          errorCount += chunkCount;
+        }
+      }
+
+      // 4. Summary Notification
+      if (successCount > 0) {
+        toast.success(`Import Complete: ${successCount} rows successfully imported. ${errorCount} rows skipped/failed.`);
         onImportComplete();
         onClose();
       } else {
