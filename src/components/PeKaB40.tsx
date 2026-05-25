@@ -242,6 +242,42 @@ const InlineNotesCell = ({
   );
 };
 
+const getWhatsAppLink = (phone: string, msg: string) => {
+  let cleaned = phone.trim().replace(/\D/g, ''); // remove non-digits
+  if (cleaned.startsWith('0')) {
+    cleaned = '6' + cleaned;
+  } else if (!cleaned.startsWith('60') && cleaned.length > 5) {
+    cleaned = '60' + cleaned;
+  }
+  return `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`;
+};
+
+const getWhatsAppMessage = (p: PeKaPatient) => {
+  const statusVal = String(p.remarks || '').trim().toLowerCase();
+  const nama_pesakit = p.name || 'Tuan/Puan';
+  const appt_date = p.appointmentDate || '-';
+  const appt_time = p.time || '-';
+  const lokasi_klinik = p.branch ? `Klinik ARA 24 Jam (${p.branch})` : 'Klinik ARA 24 Jam';
+
+  if (statusVal === 'appt given') {
+    return `Salam Tuan/Puan ${nama_pesakit},\n` +
+           `Saya dari Klinik ARA 24 Jam ingin memaklumkan bahawa tarikh temu janji saringan kesihatan percuma PeKa B40 Tuan/Puan adalah seperti berikut:\n\n` +
+           `📅 Tarikh: ${appt_date}\n` +
+           `⏰ Masa: ${appt_time}\n` +
+           `🏥 Lokasi: ${lokasi_klinik}\n\n` +
+           `Boleh hadir tepat pada masa yang ditetapkan dan bawa bersama dokumen pengenalan diri untuk tujuan pengesahan.\n` +
+           `Sekiranya ada sebarang pertanyaan atau keperluan untuk menukar tarikh, boleh maklumkan kepada pihak klinik.\n\n` +
+           `Terima kasih,\nKlinik ARA 24 Jam`;
+  } else {
+    return `Salam Tuan/Puan ${nama_pesakit},\n\n` +
+           `Tuan/Puan layak untuk menjalani saringan kesihatan percuma di bawah program PeKa B40 di Klinik ARA 24 Jam. ` +
+           `Antara ujian yang akan dijalankan termasuklah ujian sel darah, ujian kawalan gula darah, ujian paras kolesterol, ` +
+           `ujian fungsi buah pinggang dan ujian air kencing.\n\n` +
+           `Sekiranya berminat untuk membuat temu janji, boleh hubungi kami semula.\n\n` +
+           `Terima kasih,\nKlinik ARA 24 Jam`;
+  }
+};
+
 export default function PeKaB40({ currentUser }: PeKaB40Props) {
   // Local Database patients loaded from Firestore
   const [patients, setPatients] = useState<PeKaPatient[]>([]);
@@ -1036,15 +1072,11 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[1200px] border-collapse text-sm">
+            <table className="w-full text-left min-w-[1000px] border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200">
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-12">No.</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">ID</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-32">IC</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-36">Handphone</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Address</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">PostalCode</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-40">Next Appointment Date</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-32">Remarks</th>
@@ -1055,14 +1087,8 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {paginatedPatients.map((p, idx) => (
+                {paginatedPatients.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500 font-bold font-mono">
-                      {p.no || (startIndex + idx + 1)}
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-700 font-semibold font-mono">
-                      {p.patientId || '-'}
-                    </td>
                     <td className="px-5 py-4">
                       <p className="text-sm font-bold text-slate-900 uppercase truncate max-w-[160px]" title={p.name}>
                         {p.name}
@@ -1070,14 +1096,6 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600 font-mono">
                       {p.ic || '-'}
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-700 font-medium font-sans">
-                      {p.phone || '-'}
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="text-xs text-slate-500 truncate max-w-[180px]" title={p.address}>
-                        {p.address || '-'}
-                      </p>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500 font-mono">
                       {p.postalCode || '-'}
@@ -1133,9 +1151,23 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {p.phone && (
+                          <a
+                            href={getWhatsAppLink(p.phone, getWhatsAppMessage(p))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 px-2 bg-emerald-650 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+                            title="Send WhatsApp Message"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                            </svg>
+                            WhatsApp
+                          </a>
+                        )}
                         <button
                           onClick={() => handleOpenEdit(p)}
-                          className="p-1 px-2 border border-slate-200 text-slate-600 hover:text-indigo-950 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+                          className="p-1 px-2 border border-slate-200 text-slate-600 hover:text-indigo-950 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer font-sans"
                         >
                           <FileEdit className="w-3 h-3" />
                           Edit
