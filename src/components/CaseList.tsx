@@ -15,7 +15,8 @@ import {
   Upload,
   Copy,
   Undo2,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FollowUpCase, FollowUpTag, UserPermission, UserProfile, Patient } from '../types';
@@ -104,31 +105,109 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
 
   const canExportCSV = userPermissions.includes('export_csv');
 
-  const handleExportCSV = () => {
-    const csvData = filteredCases.map(c => ({
-      DateKeyIn: new Date(c.createdAt).toLocaleDateString(),
-      PatientName: c.patientName,
-      PatientID: c.patientId,
-      Branch: c.branch,
-      Diagnosis: c.diagnosis,
-      LastVisitDate: c.lastVisitDate,
-      AppointmentDate: c.appointmentDate || '',
-      DoctorInCharge: c.doctorInCharge,
-      Status: (c.status || []).join(', '),
-      Tag: c.followUpTag,
-      Phone: c.patientPhone || '',
-      Remarks: c.remarks
-    }));
+  const [exportModal, setExportModal] = useState({ isOpen: false, startPage: 1, endPage: 1, isExporting: false });
 
-    const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `follow_up_cases_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportCSV = () => {
+    setExportModal({
+      isOpen: true,
+      startPage: 1,
+      endPage: Math.ceil(filteredCases.length / itemsPerPage) || 1,
+      isExporting: false
+    });
+  };
+
+  const handleProceedExport = async () => {
+    setExportModal(prev => ({ ...prev, isExporting: true }));
+    try {
+      const startIndex = (exportModal.startPage - 1) * itemsPerPage;
+      const endIndex = exportModal.endPage * itemsPerPage;
+      const casesToExport = filteredCases.slice(Math.max(0, startIndex), Math.min(filteredCases.length, endIndex));
+
+      const csvData = [];
+      const total = casesToExport.length;
+      let count = 0;
+
+      for (const c of casesToExport) {
+        count++;
+        // We update a toast or something if this takes too long, but it should be fast enough.
+        
+        let wellnessText = '';
+        if ((c.followUpTag || '').toLowerCase().includes('arawellness')) {
+          try {
+            const q = query(collection(db, 'wellness_updates'), where('caseId', '==', c.id));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+              const updates = snapshot.docs.map(doc => doc.data() as any);
+              updates.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              const uniqueUpdates = [];
+              const seenDates = new Set();
+              for (const update of updates) {
+                const dateStr = new Date(update.createdAt).toLocaleDateString();
+                if (!seenDates.has(dateStr)) {
+                  seenDates.add(dateStr);
+                  uniqueUpdates.push(update);
+                }
+              }
+              wellnessText = uniqueUpdates.map(u => `${new Date(u.createdAt).toLocaleDateString()}: Weight ${u.weight}kg, Side Effects: ${u.sideEffects}, Refill: ${u.needsRefill ? 'Yes' : 'No'}`).join(' | ');
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        let parsedRegistry = null;
+        if (c.registryData) {
+          try {
+            parsedRegistry = typeof c.registryData === 'string' ? JSON.parse(c.registryData) : c.registryData;
+          } catch (e) {}
+        }
+
+        csvData.push({
+          DateKeyIn: new Date(c.createdAt).toLocaleDateString(),
+          PatientName: c.patientName,
+          PatientID: c.patientId,
+          Branch: c.branch,
+          Diagnosis: c.diagnosis,
+          LastVisitDate: c.lastVisitDate,
+          AppointmentDate: c.appointmentDate || '',
+          DoctorInCharge: c.doctorInCharge,
+          Status: (c.status || []).join(', '),
+          Tag: c.followUpTag,
+          Phone: c.patientPhone || '',
+          Remarks: c.remarks,
+          // NCD specific
+          NCD_LastBloodTest: parsedRegistry?.type === 'NCD' ? parsedRegistry.lastBloodTest : '',
+          NCD_NextBloodTestDue: parsedRegistry?.type === 'NCD' ? parsedRegistry.nextBloodTestDue : '',
+          NCD_Medication: parsedRegistry?.type === 'NCD' ? parsedRegistry.medication : '',
+          NCD_RefillStatus: parsedRegistry?.type === 'NCD' ? parsedRegistry.refillStatus : '',
+          NCD_Compliance: parsedRegistry?.type === 'NCD' ? parsedRegistry.compliance : '',
+          // ANC specific
+          ANC_GAWeeks: parsedRegistry?.type === 'ANC' ? parsedRegistry.gaWeeks : '',
+          ANC_SupplementGiven: parsedRegistry?.type === 'ANC' ? parsedRegistry.supplementGiven : '',
+          ANC_Compliance: parsedRegistry?.type === 'ANC' ? parsedRegistry.compliance : '',
+          ANC_RiskCategory: parsedRegistry?.type === 'ANC' ? parsedRegistry.riskCategory : '',
+          // Wellness
+          WellnessUpdates: wellnessText
+        });
+      }
+
+      const csv = Papa.unparse(csvData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `follow_up_cases_pages_${exportModal.startPage}-${exportModal.endPage}_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('CSV exported successfully!');
+      setExportModal(prev => ({ ...prev, isOpen: false }));
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export CSV');
+    } finally {
+      setExportModal(prev => ({ ...prev, isExporting: false }));
+    }
   };
 
   const executeReturn = async () => {
@@ -777,6 +856,87 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                 className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold text-xs hover:bg-slate-800 transition-colors"
               >
                 CLOSE HISTORY
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export CSV Modal */}
+      {exportModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-indigo-600" />
+                Export CSV
+              </h3>
+              <button 
+                onClick={() => setExportModal(prev => ({ ...prev, isOpen: false }))} 
+                className="p-1 hover:bg-slate-100 rounded text-slate-400 transition-colors"
+                disabled={exportModal.isExporting}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm border border-indigo-100 bg-indigo-50 text-indigo-700 p-3 rounded-lg font-medium mb-6">
+                Total available pages: <span className="font-bold text-lg">{Math.ceil(filteredCases.length / itemsPerPage) || 1}</span>
+              </p>
+              
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Start Page</label>
+                  <input 
+                    type="number"
+                    min="1"
+                    max={Math.ceil(filteredCases.length / itemsPerPage) || 1}
+                    value={exportModal.startPage}
+                    onChange={(e) => setExportModal(prev => ({ ...prev, startPage: parseInt(e.target.value) || 1 }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">End Page</label>
+                  <input 
+                    type="number"
+                    min={exportModal.startPage}
+                    max={Math.ceil(filteredCases.length / itemsPerPage) || 1}
+                    value={exportModal.endPage}
+                    onChange={(e) => setExportModal(prev => ({ ...prev, endPage: parseInt(e.target.value) || 1 }))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded text-center">
+                This will export data including <b>Wellness Updates</b> and <b>Registry Data (NCD/ANC)</b> for the selected pages.
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button 
+                onClick={() => setExportModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
+                disabled={exportModal.isExporting}
+              >
+                CANCEL
+              </button>
+              <button 
+                onClick={handleProceedExport}
+                className="px-4 py-2 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                disabled={exportModal.isExporting || exportModal.startPage > exportModal.endPage}
+              >
+                {exportModal.isExporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    EXPORTING...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    DOWNLOAD CSV
+                  </>
+                )}
               </button>
             </div>
           </div>
