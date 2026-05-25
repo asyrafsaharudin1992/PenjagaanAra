@@ -459,7 +459,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         if (!val('ic')) missingFields.push('IC');
         if (!val('phone')) missingFields.push('Handphone');
 
-        const isDuplicate = existingIcs.has(rawIc) || existingPhones.has(rawPhone);
+        const isDuplicate = existingIcs.has(rawIc) || (rawPhone ? existingPhones.has(rawPhone) : false);
 
         return {
           patientId: val('patientId') || `PK-${Date.now().toString().slice(-4)}-${index + 1}`,
@@ -473,7 +473,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           time: val('time'),
           additionalNotes: val('additionalNotes'),
           branch: val('branch') || currentUser.branch || 'Kajang',
-          isValid: missingFields.length === 0,
+          isValid: !missingFields.includes('Name') && !missingFields.includes('IC'),
           missingFields,
           isDuplicate,
           rawData: row
@@ -582,11 +582,17 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   };
 
   const filteredPatients = patients.filter(p => {
+    const nameStr = String(p.name || '').toLowerCase();
+    const icStr = String(p.ic || '');
+    const phoneStr = String(p.phone || '');
+    const patientIdStr = String(p.patientId || '').toLowerCase();
+    const searchLower = (searchTerm || '').toLowerCase();
+
     const matchesSearch = 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.ic.includes(searchTerm) ||
-      p.phone.includes(searchTerm) ||
-      p.patientId.toLowerCase().includes(searchTerm.toLowerCase());
+      nameStr.includes(searchLower) ||
+      icStr.includes(searchLower) ||
+      phoneStr.includes(searchLower) ||
+      patientIdStr.includes(searchLower);
       
     const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
     const matchesRemarks = remarksFilter === 'All' || p.remarks === remarksFilter;
@@ -1486,7 +1492,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                               <td className="px-4 py-2.5 text-center">
                                 <input
                                   type="checkbox"
-                                  disabled={!patient.isValid}
+                                  disabled={!patient.name.trim()}
                                   checked={isSelected}
                                   onChange={() => {
                                     const next = new Set(selectedImportRows);
