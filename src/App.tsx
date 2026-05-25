@@ -72,6 +72,8 @@ function enforceRole(userData: UserProfile, email: string | null): UserProfile {
   const defaultPermissions: UserProfile['permissions'] =
     userData.role === 'Admin'
       ? ['create_case', 'delete_case', 'view_history', 'ai_analysis', 'view_dashboard', 'whatsapp_patient']
+      : userData.role === 'Staff'
+      ? ['view_history']
       : ['create_case', 'view_history', 'ai_analysis', 'view_dashboard'];
 
   return {
@@ -141,6 +143,13 @@ export default function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Staff Role Tab Restriction
+  useEffect(() => {
+    if (user?.role === 'Staff' && activeTab !== 'peka_b40') {
+      setActiveTab('peka_b40');
+    }
+  }, [user, activeTab]);
 
   // Auth Listener
   useEffect(() => {
@@ -376,6 +385,11 @@ export default function App() {
 
   // Tab Permission Checker
   const handleSetActiveTab = (tabId: string) => {
+    if (user?.role === 'Staff' && tabId !== 'peka_b40') {
+      setShowUnauthorizedModal(true);
+      return;
+    }
+
     const permissionsMap: Record<string, string[]> = {
       'dashboard': ['view_dashboard'],
       'cases': ['create_case', 'view_history'],
