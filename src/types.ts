@@ -1,4 +1,4 @@
-export type UserRole = 'Doctor' | 'Admin' | 'Superadmin';
+export type UserRole = 'Doctor' | 'Admin' | 'Superadmin' | 'Staff';
 
 export type UserPermission = 
   | 'create_case' 
