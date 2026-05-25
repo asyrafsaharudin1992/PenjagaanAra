@@ -1,0 +1,1579 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  FileSpreadsheet, 
+  Search, 
+  RefreshCw, 
+  Plus, 
+  X, 
+  AlertCircle, 
+  User, 
+  MapPin, 
+  Calendar, 
+  Smartphone, 
+  ChevronLeft, 
+  ChevronRight,
+  Mail,
+  Clock,
+  FileEdit,
+  Users,
+  Trash2,
+  Upload,
+  ArrowRight,
+  CheckCircle,
+  Download,
+  Check
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  deleteDoc, 
+  query, 
+  orderBy, 
+  writeBatch 
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import { cn } from '../lib/utils';
+import { UserProfile } from '../types';
+import Papa from 'papaparse';
+
+interface PeKaB40Props {
+  currentUser: UserProfile;
+}
+
+interface PeKaPatient {
+  id: string; // doc ID in firestore
+  no: string;
+  patientId: string;
+  name: string;
+  ic: string;
+  phone: string;
+  address: string;
+  postalCode: string;
+  appointmentDate: string;
+  remarks: string;
+  time: string;
+  additionalNotes: string;
+  branch: string;
+  createdAt: string;
+}
+
+interface ColumnMapping {
+  patientId: string | null;
+  name: string | null;
+  ic: string | null;
+  phone: string | null;
+  address: string | null;
+  postalCode: string | null;
+  appointmentDate: string | null;
+  remarks: string | null;
+  time: string | null;
+  additionalNotes: string | null;
+  branch: string | null;
+}
+
+interface ImportedPatient {
+  patientId: string;
+  name: string;
+  ic: string;
+  phone: string;
+  address: string;
+  postalCode: string;
+  appointmentDate: string;
+  remarks: string;
+  time: string;
+  additionalNotes: string;
+  branch: string;
+  isValid: boolean;
+  missingFields: string[];
+  isDuplicate: boolean;
+  rawData: any;
+}
+
+export default function PeKaB40({ currentUser }: PeKaB40Props) {
+  // Local Database patients loaded from Firestore
+  const [patients, setPatients] = useState<PeKaPatient[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
+
+  // Search & Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [branchFilter, setBranchFilter] = useState('All');
+  const [remarksFilter, setRemarksFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+
+  // Single patient Modals & Drawers
+  const [selectedPatient, setSelectedPatient] = useState<PeKaPatient | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Form states for Editing / Adding
+  const [formName, setFormName] = useState('');
+  const [formIC, setFormIC] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formAddress, setFormAddress] = useState('');
+  const [formPostalCode, setFormPostalCode] = useState('');
+  const [formApptDate, setFormApptDate] = useState('');
+  const [formRemarks, setFormRemarks] = useState('Not contacted yet');
+  const [formTime, setFormTime] = useState('');
+  const [formNotes, setFormNotes] = useState('');
+  const [formBranch, setFormBranch] = useState('Kajang');
+  const [formCustomId, setFormCustomId] = useState('');
+
+  // CSV Import States
+  const [showCSVImportModal, setShowCSVImportModal] = useState(false);
+  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
+    patientId: null,
+    name: null,
+    ic: null,
+    phone: null,
+    address: null,
+    postalCode: null,
+    appointmentDate: null,
+    remarks: null,
+    time: null,
+    additionalNotes: null,
+    branch: null,
+  });
+  const [importedPatients, setImportedPatients] = useState<ImportedPatient[]>([]);
+  const [selectedImportRows, setSelectedImportRows] = useState<Set<number>>(new Set());
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+
+  // Dropdown options for remarks/status
+  const remarksOptions = [
+    'Not contacted yet',
+    'Call not answered',
+    'To call again',
+    'Appt date given',
+    'Refuse',
+    'No answer',
+    'WhatsApp sent',
+    'Wrong number',
+    'Out of service'
+  ];
+
+  // Load firestore data on mount
+  useEffect(() => {
+    loadFirestoreData();
+  }, []);
+
+  // Fetch from firestore collection 'peka_b40_patients'
+  const loadFirestoreData = async () => {
+    setIsLoading(true);
+    try {
+      const q = query(collection(db, 'peka_b40_patients'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const list: PeKaPatient[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        list.push({
+          id: docSnap.id,
+          no: data.no || '',
+          patientId: data.patientId || '',
+          name: data.name || '',
+          ic: data.ic || '',
+          phone: data.phone || '',
+          address: data.address || '',
+          postalCode: data.postalCode || '',
+          appointmentDate: data.appointmentDate || '',
+          remarks: data.remarks || 'Not contacted yet',
+          time: data.time || '',
+          additionalNotes: data.additionalNotes || '',
+          branch: data.branch || 'Kajang',
+          createdAt: data.createdAt || ''
+        });
+      });
+      setPatients(list);
+      setLastRefreshed(new Date().toLocaleTimeString());
+    } catch (error: any) {
+      console.error("Error reading peka_b40_patients:", error);
+      toast.error("Failed to load PeKa B40 patient records: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save changes for editing
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatient) return;
+
+    if (!formName.trim() || !formPhone.trim() || !formIC.trim()) {
+      toast.error("Name, IC No, and Phone number are required fields.");
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const docRef = doc(db, 'peka_b40_patients', selectedPatient.id);
+      const updatedData = {
+        name: formName.trim().toUpperCase(),
+        ic: formIC.trim(),
+        phone: formPhone.trim().replace(/\s+/g, ''),
+        address: formAddress.trim(),
+        postalCode: formPostalCode.trim(),
+        appointmentDate: formApptDate,
+        remarks: formRemarks,
+        time: formTime.trim(),
+        additionalNotes: formNotes.trim(),
+        branch: formBranch,
+        patientId: formCustomId.trim()
+      };
+
+      await setDoc(docRef, updatedData, { merge: true });
+      toast.success(`Successfully updated details for ${formName}!`);
+      setIsEditModalOpen(false);
+      setSelectedPatient(null);
+      loadFirestoreData();
+    } catch (error: any) {
+      console.error("Failed to save edited patient details:", error);
+      toast.error(`Failed to save record: ${error.message}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Add individual patient
+  const handleAddPatient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim() || !formPhone.trim() || !formIC.trim()) {
+      toast.error("Name, IC, and No Telefon are required fields.");
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      // Find the next serial number
+      const nextNo = patients.length > 0 
+        ? String(Math.max(...patients.map(p => parseInt(p.no) || 0)) + 1)
+        : '1';
+
+      const nextId = formCustomId.trim() || `PK-${Date.now().toString().slice(-6)}`;
+
+      const newPatientData = {
+        no: nextNo,
+        patientId: nextId,
+        name: formName.trim().toUpperCase(),
+        ic: formIC.trim(),
+        phone: formPhone.trim().replace(/\s+/g, ''),
+        address: formAddress.trim(),
+        postalCode: formPostalCode.trim(),
+        appointmentDate: formApptDate,
+        remarks: formRemarks,
+        time: formTime.trim(),
+        additionalNotes: formNotes.trim(),
+        branch: formBranch,
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'peka_b40_patients'), newPatientData);
+      toast.success(`Patient "${formName}" successfully added!`);
+      setIsAddModalOpen(false);
+      loadFirestoreData();
+    } catch (err: any) {
+      console.error("Failed to append patient record:", err);
+      toast.error(`Failed to add record: ${err.message}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Delete individual patient
+  const handleDeletePatient = async (patient: PeKaPatient) => {
+    const isConfirmed = window.confirm(`Are you sure you want to delete patient "${patient.name}"?`);
+    if (!isConfirmed) return;
+
+    try {
+      await deleteDoc(doc(db, 'peka_b40_patients', patient.id));
+      toast.success(`Successfully deleted patient "${patient.name}"`);
+      loadFirestoreData();
+    } catch (error: any) {
+      console.error("Delete patient error:", error);
+      toast.error("Failed to delete patient record: " + error.message);
+    }
+  };
+
+  // Open modals with prefilled data
+  const handleOpenEdit = (p: PeKaPatient) => {
+    setSelectedPatient(p);
+    setFormName(p.name);
+    setFormIC(p.ic);
+    setFormPhone(p.phone);
+    setFormAddress(p.address);
+    setFormPostalCode(p.postalCode);
+    setFormApptDate(p.appointmentDate);
+    setFormRemarks(p.remarks || 'Not contacted yet');
+    setFormTime(p.time);
+    setFormNotes(p.additionalNotes);
+    setFormBranch(p.branch || 'Kajang');
+    setFormCustomId(p.patientId);
+    setIsEditModalOpen(true);
+  };
+
+  const handleOpenAdd = () => {
+    setFormName('');
+    setFormIC('');
+    setFormPhone('');
+    setFormAddress('');
+    setFormPostalCode('');
+    setFormApptDate('');
+    setFormRemarks('Not contacted yet');
+    setFormTime('');
+    setFormNotes('');
+    setFormBranch(currentUser.branch || 'Kajang');
+    setFormCustomId('');
+    setIsAddModalOpen(true);
+  };
+
+  // CSV Parsing Handlers
+  const handleCSVFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.errors.length > 0) {
+          console.error("CSV parsing errors:", results.errors);
+          toast.error(`Error parsing CSV file: ${results.errors[0].message}`);
+          return;
+        }
+
+        if (!results.data || results.data.length === 0) {
+          toast.error("This CSV file contains no readable rows.");
+          return;
+        }
+
+        const headers = results.meta.fields || [];
+        if (headers.length === 0) {
+          toast.error("Could not determine headers in your file.");
+          return;
+        }
+
+        setCsvHeaders(headers);
+        setCsvData(results.data);
+        autoDetectMapping(headers);
+        setImportStep('mapping');
+        toast.success(`Successfully parsed ${results.data.length} rows from CSV`);
+      },
+      error: (err) => {
+        toast.error(`Failed to read file: ${err.message}`);
+      }
+    });
+
+    e.target.value = '';
+  };
+
+  // Smart detect Malay/English heading matching
+  const autoDetectMapping = (headers: string[]) => {
+    const mapping: ColumnMapping = {
+      patientId: null,
+      name: null,
+      ic: null,
+      phone: null,
+      address: null,
+      postalCode: null,
+      appointmentDate: null,
+      remarks: null,
+      time: null,
+      additionalNotes: null,
+      branch: null,
+    };
+
+    headers.forEach(header => {
+      const lower = header.toLowerCase().trim();
+
+      if (lower === 'id' || lower.includes('patient id') || lower.includes('patientid')) {
+        mapping.patientId = header;
+      } else if (lower.includes('name') || lower.includes('nama') || lower === 'nama penuh') {
+        mapping.name = header;
+      } else if (lower.includes('ic') || lower.includes('kp') || lower.includes('kad pengenalan') || lower.includes('nokp') || lower.includes('k/p')) {
+        mapping.ic = header;
+      } else if (lower.includes('phone') || lower.includes('tel') || lower.includes('mobile') || lower.includes('telefon') || lower.includes('handphone') || lower.includes('no telefon')) {
+        mapping.phone = header;
+      } else if (lower.includes('address') || lower.includes('alamat')) {
+        mapping.address = header;
+      } else if (lower.includes('postal') || lower.includes('poskod') || lower.includes('postcode') || lower.includes('postalcode')) {
+        mapping.postalCode = header;
+      } else if (lower.includes('appointment') || lower.includes('appt') || lower.includes('date') || lower.includes('tarikh') || lower.includes('temujanji')) {
+        mapping.appointmentDate = header;
+      } else if (lower.includes('remark') || lower.includes('status') || lower.includes('catatan status')) {
+        mapping.remarks = header;
+      } else if (lower.includes('time') || lower.includes('masa')) {
+        mapping.time = header;
+      } else if (lower.includes('note') || lower.includes('additional') || lower.includes('ulasan') || lower.includes('catatan')) {
+        mapping.additionalNotes = header;
+      } else if (lower.includes('branch') || lower.includes('cawangan') || lower.includes('klinik')) {
+        mapping.branch = header;
+      }
+    });
+
+    setColumnMapping(mapping);
+  };
+
+  const handleMappingChange = (field: keyof ColumnMapping, column: string | null) => {
+    setColumnMapping(prev => ({ ...prev, [field]: column }));
+  };
+
+  const applyMappingAndPreview = async () => {
+    if (!columnMapping.name) {
+      toast.error("Please map the 'Name' column to proceed.");
+      return;
+    }
+    if (!columnMapping.ic) {
+      toast.error("Please map the 'IC' column to proceed.");
+      return;
+    }
+    if (!columnMapping.phone) {
+      toast.error("Please map the 'Handphone' column to proceed.");
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const existingIcs = new Set(patients.map(p => p.ic.trim().replace(/[-\s]/g, '')));
+      const existingPhones = new Set(patients.map(p => p.phone.trim().replace(/[-\s]/g, '')));
+
+      const parsed: ImportedPatient[] = csvData.map((row, index) => {
+        const val = (field: keyof ColumnMapping) => {
+          const mappedCol = columnMapping[field];
+          return mappedCol ? String(row[mappedCol] || '').trim() : '';
+        };
+
+        const rawName = val('name');
+        const rawIc = val('ic').replace(/[-\s]/g, '');
+        const rawPhone = val('phone').replace(/[-\s]/g, '');
+
+        const missingFields: string[] = [];
+        if (!rawName) missingFields.push('Name');
+        if (!val('ic')) missingFields.push('IC');
+        if (!val('phone')) missingFields.push('Handphone');
+
+        const isDuplicate = existingIcs.has(rawIc) || existingPhones.has(rawPhone);
+
+        return {
+          patientId: val('patientId') || `PK-${Date.now().toString().slice(-4)}-${index + 1}`,
+          name: rawName.toUpperCase(),
+          ic: val('ic'),
+          phone: val('phone'),
+          address: val('address'),
+          postalCode: val('postalCode'),
+          appointmentDate: val('appointmentDate'),
+          remarks: val('remarks') || 'Not contacted yet',
+          time: val('time'),
+          additionalNotes: val('additionalNotes'),
+          branch: val('branch') || currentUser.branch || 'Kajang',
+          isValid: missingFields.length === 0,
+          missingFields,
+          isDuplicate,
+          rawData: row
+        };
+      });
+
+      setImportedPatients(parsed);
+      
+      const validNonDupIndices = parsed
+        .map((p, idx) => (!p.isValid || p.isDuplicate) ? -1 : idx)
+        .filter(idx => idx !== -1);
+      
+      setSelectedImportRows(new Set(validNonDupIndices));
+      setImportStep('preview');
+
+      const duplicatesCount = parsed.filter(p => p.isDuplicate).length;
+      if (duplicatesCount > 0) {
+        toast.warning(`Found ${duplicatesCount} patients with matching IC/Handphone already in database.`);
+      } else {
+        toast.success("Ready to import! Select rows and import below.");
+      }
+    } catch (e: any) {
+      toast.error("Analysis failed: " + e.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const executeCsvBatchImport = async () => {
+    const indicesToImport = Array.from(selectedImportRows);
+    if (indicesToImport.length === 0) {
+      toast.error("Please select at least 1 record to import.");
+      return;
+    }
+
+    setIsImporting(true);
+    let currentCount = 0;
+    const totalToImport = indicesToImport.length;
+    setImportProgress({ current: 0, total: totalToImport });
+
+    try {
+      const CHUNK_SIZE = 100;
+      const chunks: number[][] = [];
+      for (let i = 0; i < indicesToImport.length; i += CHUNK_SIZE) {
+        chunks.push(indicesToImport.slice(i, i + CHUNK_SIZE));
+      }
+
+      let serialCounter = patients.length > 0
+        ? Math.max(...patients.map(p => parseInt(p.no) || 0)) + 1
+        : 1;
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+
+        chunk.forEach((idx) => {
+          const patient = importedPatients[idx];
+          const newDocRef = doc(collection(db, 'peka_b40_patients'));
+          
+          batch.set(newDocRef, {
+            no: String(serialCounter++),
+            patientId: patient.patientId,
+            name: patient.name,
+            ic: patient.ic,
+            phone: patient.phone.replace(/\s+/g, ''),
+            address: patient.address,
+            postalCode: patient.postalCode,
+            appointmentDate: patient.appointmentDate,
+            remarks: patient.remarks || 'Not contacted yet',
+            time: patient.time,
+            additionalNotes: patient.additionalNotes,
+            branch: patient.branch,
+            createdAt: new Date().toISOString()
+          });
+        });
+
+        await batch.commit();
+        currentCount += chunk.length;
+        setImportProgress({ current: currentCount, total: totalToImport });
+      }
+
+      toast.success(`Success! Imported ${totalToImport} patient records.`);
+      setShowCSVImportModal(false);
+      loadFirestoreData();
+    } catch (error: any) {
+      console.error("Batch write failed:", error);
+      toast.error("Failed to save records: " + error.message);
+    } finally {
+      setIsImporting(false);
+      setImportProgress({ current: 0, total: 0 });
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "No.,ID,Name,IC,Handphone,Address,PostalCode,Next Appointment Date,Remarks,Time,Additional Notes,Cawangan\n"
+      + "1,PK-001,MOHAMMAD BIN ALI,891102145311,0123456789,No 12 Jalan Kajang Perdana,43000,2026-06-15,Not contacted yet,10:00 AM,Ulasan tambahan,Kajang\n"
+      + "2,PK-002,FATIMAH BINTI OTHMAN,920412105432,0198765432,Apartment Seri Kenanga,43300,2026-06-16,Appt date given,11:30 AM,WhatsApp sent,Seri Kembangan\n";
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "peka_b40_import_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const filteredPatients = patients.filter(p => {
+    const matchesSearch = 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.ic.includes(searchTerm) ||
+      p.phone.includes(searchTerm) ||
+      p.patientId.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
+    const matchesRemarks = remarksFilter === 'All' || p.remarks === remarksFilter;
+    
+    return matchesSearch && matchesBranch && matchesRemarks;
+  });
+
+  const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedPatients = filteredPatients.slice(startIndex, startIndex + itemsPerPage);
+
+  const getStatusBadgeClass = (status: string) => {
+    const s = String(status).trim();
+    if (s === 'Appt date given') {
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    }
+    if (s === 'Call not answered' || s === 'No answer') {
+      return 'bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    }
+    if (s === 'To call again' || s === 'WhatsApp sent') {
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    }
+    if (s === 'Not contacted yet') {
+      return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    }
+    if (s === 'Refuse') {
+      return 'bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    }
+    return 'bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Upper Header Panel */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+            <FileSpreadsheet className="w-8 h-8 text-emerald-700" />
+            PeKa B40 Patients
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Real-time database tables for PeKa B40 with filters, manual management, and robust Excel/CSV file imports.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={loadFirestoreData}
+            disabled={isLoading}
+            className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl bg-white hover:bg-slate-50 text-xs font-bold transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
+            REFRESH
+          </button>
+
+          <button
+            onClick={() => {
+              setImportStep('upload');
+              setCsvHeaders([]);
+              setCsvData([]);
+              setImportedPatients([]);
+              setSelectedImportRows(new Set());
+              setShowCSVImportModal(true);
+            }}
+            className="px-4 py-2 border border-emerald-200 text-emerald-800 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            IMPORT CSV
+          </button>
+
+          <button
+            onClick={handleOpenAdd}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-950 text-white rounded-xl font-bold text-xs hover:bg-indigo-900 transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            ADD PATIENT
+          </button>
+        </div>
+      </div>
+
+      {/* Quick stats grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Total Records</span>
+            <span className="text-3xl font-black text-slate-900 block mt-1">{patients.length}</span>
+          </div>
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-950 rounded-xl flex items-center justify-center">
+            <Users className="w-6 h-6" />
+          </div>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-widest block">Appointments Set</span>
+            <span className="text-3xl font-black text-emerald-600 block mt-1">
+              {patients.filter(p => p.remarks === 'Appt date given').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center">
+            <Calendar className="w-6 h-6" />
+          </div>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-widest block font-sans">To Call Again</span>
+            <span className="text-3xl font-black text-indigo-600 block mt-1 font-sans">
+              {patients.filter(p => p.remarks === 'To call again' || p.remarks === 'Not contacted yet').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center">
+            <Clock className="w-6 h-6" />
+          </div>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Closed / Refused</span>
+            <span className="text-3xl font-black text-rose-600 block mt-1">
+              {patients.filter(p => p.remarks === 'Call not answered' || p.remarks === 'Refuse' || p.remarks === 'No answer').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters & Search */}
+      <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full md:w-96">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400">
+            <Search className="w-4 h-4" />
+          </span>
+          <input
+            type="text"
+            placeholder="Search PeKa patients by Name, IC, ID, Phone..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm rounded-xl placeholder-slate-400 font-semibold outline-none"
+          />
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs text-slate-400 font-extrabold uppercase tracking-wider whitespace-nowrap hidden lg:inline">Cawangan:</span>
+            <select
+              value={branchFilter}
+              onChange={(e) => {
+                setBranchFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full sm:w-44 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-xs font-bold rounded-xl outline-none transition-colors"
+            >
+              <option value="All">All Cawangan</option>
+              <option value="Kajang">Kajang</option>
+              <option value="Seri Kembangan">Seri Kembangan</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs text-slate-400 font-extrabold uppercase tracking-wider whitespace-nowrap hidden lg:inline">Status:</span>
+            <select
+              value={remarksFilter}
+              onChange={(e) => {
+                setRemarksFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full sm:w-48 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-xs font-bold rounded-xl outline-none transition-colors"
+            >
+              <option value="All">All Statuses</option>
+              {remarksOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Records Table */}
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+        {isLoading ? (
+          <div className="py-24 text-center">
+            <RefreshCw className="w-10 h-10 text-indigo-950 animate-spin mx-auto mb-3" />
+            <p className="text-slate-500 text-sm font-semibold">Communicating with Firestore database...</p>
+          </div>
+        ) : filteredPatients.length === 0 ? (
+          <div className="py-20 text-center">
+            <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100 text-slate-400">
+              <Search className="w-6 h-6" />
+            </div>
+            <p className="text-slate-900 font-bold text-base">No PeKa B40 Patients Found</p>
+            <p className="text-slate-400 text-xs mt-1">You can add individual records on top, or click `Import CSV` on top to upload your file.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[1200px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-200">
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-12">No.</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">ID</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-32">IC</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-36">Handphone</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Address</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">PostalCode</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-40">Next Appointment Date</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-32">Remarks</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">Time</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Additional Notes</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-28">Cawangan</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedPatients.map((p, idx) => (
+                  <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
+                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500 font-bold font-mono">
+                      {p.no || (startIndex + idx + 1)}
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-700 font-semibold font-mono">
+                      {p.patientId || '-'}
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-sm font-bold text-slate-900 uppercase truncate max-w-[160px]" title={p.name}>
+                        {p.name}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600 font-mono">
+                      {p.ic || '-'}
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-700 font-medium font-sans">
+                      {p.phone || '-'}
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs text-slate-500 truncate max-w-[180px]" title={p.address}>
+                        {p.address || '-'}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500 font-mono">
+                      {p.postalCode || '-'}
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      {p.appointmentDate ? (
+                        <span className="flex items-center gap-1.5 text-slate-800 font-semibold text-xs">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-950 shrink-0" />
+                          {p.appointmentDate}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-normal italic">-</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={getStatusBadgeClass(p.remarks)}>
+                        {p.remarks || 'Not contacted yet'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600 font-mono">
+                      {p.time || '-'}
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="text-xs text-slate-400 truncate max-w-[150px] italic font-medium" title={p.additionalNotes}>
+                        {p.additionalNotes || '-'}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 rounded px-2.5 py-0.5">
+                        {p.branch || 'Kajang'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(p)}
+                          className="p-1 px-2 border border-slate-200 text-slate-600 hover:text-indigo-950 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+                        >
+                          <FileEdit className="w-3 h-3" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeletePatient(p)}
+                          className="p-1 text-rose-600 hover:text-rose-850 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs text-slate-500 font-semibold">
+              Showing <b>{startIndex + 1}</b> - <b>{Math.min(startIndex + itemsPerPage, filteredPatients.length)}</b> of <b>{filteredPatients.length}</b> records
+            </span>
+            
+            <div className="flex gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className="p-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              
+              <span className="text-xs text-slate-700 font-bold flex items-center px-1">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                className="p-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {lastRefreshed && (
+        <p className="text-[10px] text-slate-400 text-right italic font-semibold">
+          Last updated: {lastRefreshed}
+        </p>
+      )}
+
+      {/* MODAL: ADD PATIENT */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-indigo-950/2">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-950" />
+                Add PeKa B40 Patient
+              </h3>
+              <button 
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleAddPatient} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">IC No. *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 891122105432"
+                    value={formIC}
+                    onChange={(e) => setFormIC(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Handphone *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 0123456789"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Patient ID (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="PK-001"
+                    value={formCustomId}
+                    onChange={(e) => setFormCustomId(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Alamat Kediaman (Address)</label>
+                <input
+                  type="text"
+                  placeholder="Street and house details"
+                  value={formAddress}
+                  onChange={(e) => setFormAddress(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">PostalCode</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 43000"
+                    value={formPostalCode}
+                    onChange={(e) => setFormPostalCode(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cawangan *</label>
+                  <select
+                    value={formBranch}
+                    onChange={(e) => setFormBranch(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  >
+                    <option value="Kajang">Kajang</option>
+                    <option value="Seri Kembangan">Seri Kembangan</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Remarks Status</label>
+                  <select
+                    value={formRemarks}
+                    onChange={(e) => setFormRemarks(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  >
+                    {remarksOptions.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Next Appointment Date</label>
+                  <input
+                    type="date"
+                    value={formApptDate}
+                    onChange={(e) => setFormApptDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 10:00 AM"
+                    value={formTime}
+                    onChange={(e) => setFormTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Additional Notes</label>
+                <textarea
+                  rows={2}
+                  value={formNotes}
+                  onChange={(e) => setFormNotes(e.target.value)}
+                  placeholder="Insert extra observations or details here..."
+                  className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="flex-1 px-4 py-2.5 bg-indigo-950 hover:bg-indigo-900 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isUpdating ? "Saving..." : "Add Patient"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT PATIENT */}
+      {isEditModalOpen && selectedPatient && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-indigo-950/2">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <FileEdit className="w-5 h-5 text-indigo-950" />
+                Modify PeKa Patient
+              </h3>
+              <button 
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedPatient(null);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">IC No. *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formIC}
+                    onChange={(e) => setFormIC(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Handphone *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Patient ID (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="PK-001"
+                    value={formCustomId}
+                    onChange={(e) => setFormCustomId(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Alamat Kediaman (Address)</label>
+                <input
+                  type="text"
+                  value={formAddress}
+                  onChange={(e) => setFormAddress(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">PostalCode</label>
+                  <input
+                    type="text"
+                    value={formPostalCode}
+                    onChange={(e) => setFormPostalCode(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cawangan</label>
+                  <select
+                    value={formBranch}
+                    onChange={(e) => setFormBranch(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-sm font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  >
+                    <option value="Kajang">Kajang</option>
+                    <option value="Seri Kembangan">Seri Kembangan</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Remarks Status</label>
+                  <select
+                    value={formRemarks}
+                    onChange={(e) => setFormRemarks(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  >
+                    {remarksOptions.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Next Appointment Date</label>
+                  <input
+                    type="date"
+                    value={formApptDate}
+                    onChange={(e) => setFormApptDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Time</label>
+                  <input
+                    type="text"
+                    value={formTime}
+                    onChange={(e) => setFormTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Additional Notes</label>
+                <textarea
+                  rows={2}
+                  value={formNotes}
+                  onChange={(e) => setFormNotes(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedPatient(null);
+                  }}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="flex-1 px-4 py-2.5 bg-indigo-950 hover:bg-indigo-900 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isUpdating ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EXCEL/CSV IMPORT FLOW */}
+      {showCSVImportModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-100">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50/20">
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-700" />
+                  Import PeKa B40 Patients from CSV
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">Upload files with corresponding patient values to perform bulk import.</p>
+              </div>
+              <button 
+                onClick={() => setShowCSVImportModal(false)}
+                className="p-1 px-2 text-slate-400 hover:text-slate-650 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Step Indicators */}
+            <div className="bg-slate-50 px-6 py-3 border-b border-slate-150 flex items-center gap-6">
+              <span className={cn(
+                "text-xs font-bold flex items-center gap-1.5",
+                importStep === 'upload' ? "text-indigo-950" : "text-slate-400 font-semibold"
+              )}>
+                <span className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]",
+                  importStep === 'upload' ? "bg-indigo-950 text-white" : "bg-slate-200 text-slate-600"
+                )}>1</span>
+                Upload CSV
+              </span>
+              <span className="text-slate-350 select-none">/</span>
+              <span className={cn(
+                "text-xs font-bold flex items-center gap-1.5",
+                importStep === 'mapping' ? "text-indigo-950" : "text-slate-400 font-semibold"
+              )}>
+                <span className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]",
+                  importStep === 'mapping' ? "bg-indigo-950 text-white" : "bg-slate-200 text-slate-600"
+                )}>2</span>
+                Match Columns
+              </span>
+              <span className="text-slate-350 select-none">/</span>
+              <span className={cn(
+                "text-xs font-bold flex items-center gap-1.5",
+                importStep === 'preview' ? "text-indigo-950" : "text-slate-400 font-semibold"
+              )}>
+                <span className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]",
+                  importStep === 'preview' ? "bg-indigo-950 text-white" : "bg-slate-200 text-slate-600"
+                )}>3</span>
+                Cherry-pick & Import
+              </span>
+            </div>
+
+            {/* Content body */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              
+              {/* Step 1: Upload */}
+              {importStep === 'upload' && (
+                <div className="space-y-6">
+                  <div className="border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 hover:bg-slate-50 p-10 text-center transition-all relative flex flex-col items-center justify-center">
+                    <div className="w-12 h-12 bg-white text-emerald-700 rounded-xl flex items-center justify-center shadow-xs mb-3 border border-slate-200/50">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    
+                    <p className="text-sm font-bold text-slate-800">Drag your patient CSV spreadsheet files here</p>
+                    <p className="text-xs text-slate-400 mt-1 mb-4">Accepts spreadsheet CSV files</p>
+                    
+                    <button 
+                      onClick={() => document.getElementById('peka-csv-uploader')?.click()}
+                      className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-xs font-extrabold text-slate-705 rounded-xl transition-all shadow-xs cursor-pointer"
+                    >
+                      BROWSE FILES
+                    </button>
+                    
+                    <input 
+                      type="file" 
+                      id="peka-csv-uploader" 
+                      accept=".csv"
+                      onChange={handleCSVFileUpload}
+                      className="hidden" 
+                    />
+                  </div>
+
+                  <div className="border border-slate-205 rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">Need a format template file?</h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Download our preconfigured column blueprint to easily arrange your patient rows.</p>
+                    </div>
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      DOWNLOAD TEMPLATE
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Mapping */}
+              {importStep === 'mapping' && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-800">Match columns precisely</h4>
+                      <p className="text-[11px] text-amber-700/95 mt-0.5">Please map each PeKa B40 field to the header name from your uploaded file to ensure perfect data integrity. Fields with * are highly recommended.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.keys(columnMapping).map((key) => {
+                      const field = key as keyof ColumnMapping;
+                      const isRequired = field === 'name' || field === 'ic' || field === 'phone';
+                      const label = field === 'patientId' ? 'ID / Patient ID' :
+                                    field === 'name' ? 'Name *' :
+                                    field === 'ic' ? 'IC / Identification *' :
+                                    field === 'phone' ? 'Handphone / Phone *' :
+                                    field === 'address' ? 'Address' :
+                                    field === 'postalCode' ? 'PostalCode' :
+                                    field === 'appointmentDate' ? 'Next Appointment Date' :
+                                    field === 'remarks' ? 'Remarks Status' :
+                                    field === 'time' ? 'Time' :
+                                    field === 'additionalNotes' ? 'Additional Notes' : 'Cawangan (Branch)';
+                      
+                      return (
+                        <div key={field} className="border border-slate-150 p-3 rounded-xl bg-slate-50/30 flex items-center justify-between gap-4">
+                          <span className={cn("text-xs font-extrabold text-slate-700", isRequired && "text-slate-900 font-black")}>
+                            {label}
+                          </span>
+                          <select
+                            value={columnMapping[field] || ''}
+                            onChange={(e) => handleMappingChange(field, e.target.value || null)}
+                            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold w-48 outline-none"
+                          >
+                            <option value="">-- Ignored / Empty --</option>
+                            {csvHeaders.map(h => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <button
+                      onClick={() => setImportStep('upload')}
+                      className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={applyMappingAndPreview}
+                      disabled={isImporting}
+                      className="px-5 py-2 bg-indigo-950 hover:bg-indigo-900 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer disabled:opacity-55"
+                    >
+                      CONTINUE PREVIEW
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Selection Preview */}
+              {importStep === 'preview' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">
+                        Patients Table Preview ({importedPatients.length} rows processed)
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">Check/uncheck rows below to control what actually gets written to the Live Database.</p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const allIdx = importedPatients.map((_, i) => i);
+                          setSelectedImportRows(new Set(allIdx));
+                        }}
+                        className="text-xs text-indigo-900 hover:underline font-bold bg-none cursor-pointer"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        onClick={() => setSelectedImportRows(new Set())}
+                        className="text-xs text-slate-500 hover:underline font-bold bg-none cursor-pointer"
+                      >
+                        Deselect All
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-[350px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse text-xs min-w-[750px]">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200">
+                          <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-12 text-center">Import?</th>
+                          <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Patient Name</th>
+                          <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-32">IC</th>
+                          <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-32">Handphone</th>
+                          <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider w-52">Validation Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-155">
+                        {importedPatients.map((patient, index) => {
+                          const isSelected = selectedImportRows.has(index);
+                          return (
+                            <tr key={index} className={cn(
+                              "hover:bg-slate-50/50",
+                              !patient.isValid ? "bg-red-50/40" : "",
+                              patient.isDuplicate ? "bg-amber-50/30" : ""
+                            )}>
+                              <td className="px-4 py-2.5 text-center">
+                                <input
+                                  type="checkbox"
+                                  disabled={!patient.isValid}
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    const next = new Set(selectedImportRows);
+                                    if (next.has(index)) {
+                                      next.delete(index);
+                                    } else {
+                                      next.add(index);
+                                    }
+                                    setSelectedImportRows(next);
+                                  }}
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-2.5 font-bold text-slate-900 uppercase">
+                                {patient.name || <span className="text-red-500 font-semibold italic">Missing Full Name</span>}
+                              </td>
+                              <td className="px-4 py-2.5 font-mono text-slate-650">
+                                {patient.ic || <span className="text-red-500 font-semibold italic">Missing IC</span>}
+                              </td>
+                              <td className="px-4 py-2.5 font-mono text-slate-650">
+                                {patient.phone || <span className="text-red-500 font-semibold italic">Missing Handphone</span>}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                {!patient.isValid ? (
+                                  <span className="text-red-650 font-bold bg-red-100/50 border border-red-200 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Missing: {patient.missingFields.join(', ')}
+                                  </span>
+                                ) : patient.isDuplicate ? (
+                                  <span className="text-amber-700 font-bold bg-amber-50 border border-amber-150 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                                    <AlertCircle className="w-3 h-3" />
+                                    Potential Duplicate
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-150 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Valid Record
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Progress panel */}
+                  {isImporting && importProgress.total > 0 && (
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-indigo-950">
+                        <span>Importing Records...</span>
+                        <span>{importProgress.current} / {importProgress.total}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-indigo-950 h-full transition-all duration-200"
+                          style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <button
+                      onClick={() => setImportStep('mapping')}
+                      disabled={isImporting}
+                      className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={executeCsvBatchImport}
+                      disabled={isImporting || selectedImportRows.size === 0}
+                      className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      {isImporting ? "Importing to Firestore..." : `IMPORT ${selectedImportRows.size} PATIENTS`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
