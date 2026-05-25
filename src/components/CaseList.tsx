@@ -31,12 +31,32 @@ interface CaseListProps {
   setTagFilter: (tag: string | null) => void;
 }
 
+const STATUS_OPTIONS = ['Active', 'Responded', 'No Response', 'Defaulter'];
+const STATUS_COLORS: Record<string, string> = {
+  'Active': 'bg-[#E6F4EA] text-[#137333]',
+  'Responded': 'bg-[#E8F0FE] text-[#1A73E8]',
+  'No Response': 'bg-[#FEF7E0] text-[#B06000]',
+  'Defaulter': 'bg-[#FCE8E6] text-[#C5221F]',
+};
+
 export default function CaseList({ cases, onViewCase, currentUser, tagFilter, setTagFilter }: CaseListProps) {
   const userPermissions = currentUser.permissions || [];
   const userRole = currentUser.role;
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FollowUpTag | 'All'>(tagFilter ? (tagFilter as FollowUpTag) : 'All');
   const [branchFilter, setBranchFilter] = useState<string>('All');
+  const [patientStatusFilter, setPatientStatusFilter] = useState<string>('All');
+  const [statusPopoverId, setStatusPopoverId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as Element).closest('.status-popover-container')) {
+        setStatusPopoverId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   React.useEffect(() => {
     if (tagFilter) {
@@ -94,6 +114,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
       LastVisitDate: c.lastVisitDate,
       AppointmentDate: c.appointmentDate || '',
       DoctorInCharge: c.doctorInCharge,
+      Status: (c.status || []).join(', '),
       Tag: c.followUpTag,
       Phone: c.patientPhone || '',
       Remarks: c.remarks
@@ -148,6 +169,19 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
     }
   };
 
+  const toggleStatus = async (caseId: string, currentStatuses: string[], toggledStatus: string) => {
+    try {
+      const dbRef = doc(db, 'cases', caseId);
+      const newStatuses = currentStatuses.includes(toggledStatus)
+        ? currentStatuses.filter(s => s !== toggledStatus)
+        : [...currentStatuses, toggledStatus];
+      await updateDoc(dbRef, { status: newStatuses });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
+    }
+  };
+
   const filteredCases = cases.filter(c => {
     const matchesSearch = (c.patientName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
                           (c.diagnosis?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -171,6 +205,11 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
 
     const matchesBranch = branchFilter === 'All' || c.branch === branchFilter;
     
+    let matchesPatientStatus = true;
+    if (patientStatusFilter !== 'All') {
+      matchesPatientStatus = c.status && c.status.includes(patientStatusFilter) ? true : false;
+    }
+    
     const caseDate = new Date(c.createdAt);
     caseDate.setHours(0, 0, 0, 0);
     
@@ -183,7 +222,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
     const matchesDate = (!start || caseDate >= start) &&
                         (!end || caseDate <= end);
 
-    return matchesSearch && matchesStatus && matchesBranch && matchesDate;
+    return matchesSearch && matchesStatus && matchesBranch && matchesPatientStatus && matchesDate;
   });
 
   // Pagination logic
@@ -238,6 +277,16 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
             <option value="All">All Tags</option>
             {availableTags.map(tag => (
               <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+          <select 
+            value={patientStatusFilter}
+            onChange={(e) => setPatientStatusFilter(e.target.value)}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+          >
+            <option value="All">All Statuses</option>
+            {STATUS_OPTIONS.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
           {userRole === 'Superadmin' && (
@@ -319,6 +368,54 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                         )}
                       </div>
                       <p className="text-[10px] text-slate-400 mt-0.5">ID: {c.patientId}</p>
+                      <div className="status-popover-container relative mt-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div 
+                          className="flex flex-wrap gap-1 cursor-pointer min-h-[20px] items-center" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStatusPopoverId(statusPopoverId === c.id ? null : c.id);
+                          }}
+                        >
+                          {(c.status || []).length > 0 ? (
+                            (c.status || []).map(status => (
+                              <span 
+                                key={status} 
+                                className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap ${STATUS_COLORS[status] || 'bg-slate-100 text-slate-600'}`}
+                              >
+                                {status}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[9px] text-slate-400 italic">No Status</span>
+                          )}
+                        </div>
+                        {statusPopoverId === c.id && (
+                          <div className="absolute top-full left-0 mt-1 w-40 bg-white rounded-lg shadow-xl border border-slate-200 z-50 p-2 py-1.5">
+                            {STATUS_OPTIONS.map(opt => {
+                              const isActive = (c.status || []).includes(opt);
+                              return (
+                                <label key={opt} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 cursor-pointer rounded">
+                                  <div className="relative flex items-center justify-center">
+                                    <input 
+                                      type="checkbox" 
+                                      className="peer appearance-none w-4 h-4 border border-slate-300 rounded bg-white checked:bg-indigo-600 checked:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-colors cursor-pointer"
+                                      checked={isActive}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        toggleStatus(c.id, c.status || [], opt);
+                                      }}
+                                    />
+                                    <Check className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
+                                  </div>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap ${STATUS_COLORS[opt]}`}>
+                                    {opt}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
