@@ -162,6 +162,21 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           } catch (e) {}
         }
 
+        let combinedRemarks = c.remarks || '';
+        if (parsedRegistry) {
+          if (parsedRegistry?.type === 'NCD') {
+            const ncdDetails = `[NCD] Last Blood Test: ${parsedRegistry.lastBloodTest || '-'} | Next: ${parsedRegistry.nextBloodTestDue || '-'} | Meds: ${parsedRegistry.medication || '-'} | Refill: ${parsedRegistry.refillStatus || '-'} | Compliance: ${parsedRegistry.compliance || '-'}`;
+            combinedRemarks = combinedRemarks ? `${combinedRemarks}\n${ncdDetails}` : ncdDetails;
+          } else if (parsedRegistry?.type === 'ANC') {
+            const ancDetails = `[ANC] GA: ${parsedRegistry.gaWeeks || '-'} | Supplement: ${parsedRegistry.supplementGiven || '-'} | Compliance: ${parsedRegistry.compliance || '-'} | Risk: ${parsedRegistry.riskCategory || '-'}`;
+            combinedRemarks = combinedRemarks ? `${combinedRemarks}\n${ancDetails}` : ancDetails;
+          }
+        }
+        if (wellnessText) {
+          const wellnessStr = `[Wellness] ${wellnessText}`;
+          combinedRemarks = combinedRemarks ? `${combinedRemarks}\n${wellnessStr}` : wellnessStr;
+        }
+
         csvData.push({
           DateKeyIn: new Date(c.createdAt).toLocaleDateString(),
           PatientName: c.patientName,
@@ -174,20 +189,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           Status: (c.status || []).join(', '),
           Tag: c.followUpTag,
           Phone: c.patientPhone || '',
-          Remarks: c.remarks,
-          // NCD specific
-          NCD_LastBloodTest: parsedRegistry?.type === 'NCD' ? parsedRegistry.lastBloodTest : '',
-          NCD_NextBloodTestDue: parsedRegistry?.type === 'NCD' ? parsedRegistry.nextBloodTestDue : '',
-          NCD_Medication: parsedRegistry?.type === 'NCD' ? parsedRegistry.medication : '',
-          NCD_RefillStatus: parsedRegistry?.type === 'NCD' ? parsedRegistry.refillStatus : '',
-          NCD_Compliance: parsedRegistry?.type === 'NCD' ? parsedRegistry.compliance : '',
-          // ANC specific
-          ANC_GAWeeks: parsedRegistry?.type === 'ANC' ? parsedRegistry.gaWeeks : '',
-          ANC_SupplementGiven: parsedRegistry?.type === 'ANC' ? parsedRegistry.supplementGiven : '',
-          ANC_Compliance: parsedRegistry?.type === 'ANC' ? parsedRegistry.compliance : '',
-          ANC_RiskCategory: parsedRegistry?.type === 'ANC' ? parsedRegistry.riskCategory : '',
-          // Wellness
-          WellnessUpdates: wellnessText
+          Remarks: combinedRemarks
         });
       }
 
