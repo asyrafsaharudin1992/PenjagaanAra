@@ -110,6 +110,7 @@ export default function CaseDetails({
   const [editedFollowUpDoneBy, setEditedFollowUpDoneBy] = useState(caseData.followUpDoneBy || '');
   const [editedAppointmentDate, setEditedAppointmentDate] = useState(caseData.appointmentDate || '');
   const [editedLastVisitDate, setEditedLastVisitDate] = useState(caseData.lastVisitDate || '');
+  const [editedKeyInDate, setEditedKeyInDate] = useState(caseData.createdAt ? caseData.createdAt.split('T')[0] : '');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // Reset states when caseId changes (handles cases where component stays mounted)
@@ -122,7 +123,8 @@ export default function CaseDetails({
     setEditedFollowUpDoneBy(caseData.followUpDoneBy || '');
     setEditedAppointmentDate(caseData.appointmentDate || '');
     setEditedLastVisitDate(caseData.lastVisitDate || '');
-  }, [caseData.id]);
+    setEditedKeyInDate(caseData.createdAt ? caseData.createdAt.split('T')[0] : '');
+  }, [caseData.id, caseData.createdAt]);
 
   // --- ADDED: ANC and NCD field state ---
   const [ancFields, setAncFields] = useState<ANCFields>(defaultANCFields);
@@ -318,6 +320,14 @@ export default function CaseDetails({
         await setDoc(tagRef, { name: editedTag });
       }
 
+      let newCreatedAt = caseData.createdAt;
+      if (editedKeyInDate) {
+        const currentIsoDate = caseData.createdAt ? caseData.createdAt.split('T')[0] : '';
+        if (editedKeyInDate !== currentIsoDate) {
+           newCreatedAt = new Date(editedKeyInDate).toISOString();
+        }
+      }
+
       const updates: Partial<FollowUpCase> = {
         followUpTag: editedTag,
         remarks: editedRemarks,
@@ -326,7 +336,8 @@ export default function CaseDetails({
         doctorInCharge: editedDoctorInCharge,
         followUpDoneBy: editedFollowUpDoneBy,
         appointmentDate: editedAppointmentDate,
-        lastVisitDate: editedLastVisitDate
+        lastVisitDate: editedLastVisitDate,
+        createdAt: newCreatedAt
       };
 
       if (editedRemarks !== caseData.remarks) {
@@ -827,19 +838,36 @@ export default function CaseDetails({
               />
             </div>
 
-            <div className="space-y-3">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Follow up done by</label>
-              <div className="bg-white border border-slate-300 px-4 py-2 rounded-xl flex items-center gap-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-600 transition-all shadow-sm">
-                <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                  <User className="w-4 h-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Follow up done by</label>
+                <div className="bg-white border border-slate-300 px-4 py-2 rounded-xl flex items-center gap-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-600 transition-all shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input 
+                    type="text"
+                    value={editedFollowUpDoneBy}
+                    onChange={(e) => setEditedFollowUpDoneBy(e.target.value)}
+                    className="flex-1 text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 outline-none p-0"
+                    placeholder="Enter staff name..."
+                  />
                 </div>
-                <input 
-                  type="text"
-                  value={editedFollowUpDoneBy}
-                  onChange={(e) => setEditedFollowUpDoneBy(e.target.value)}
-                  className="flex-1 text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 outline-none p-0"
-                  placeholder="Enter staff name..."
-                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Key-in Date</label>
+                <div className="bg-white border border-slate-300 px-4 py-2 rounded-xl flex items-center gap-3 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-600 transition-all shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <input 
+                    type="date"
+                    value={editedKeyInDate}
+                    onChange={(e) => setEditedKeyInDate(e.target.value)}
+                    className="flex-1 text-sm font-bold text-slate-700 bg-transparent border-none focus:ring-0 outline-none p-0"
+                  />
+                </div>
               </div>
             </div>
 
