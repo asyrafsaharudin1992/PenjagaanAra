@@ -150,16 +150,32 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
 
   // Dropdown options for remarks/status
   const remarksOptions = [
-    'Not contacted yet',
-    'Call not answered',
-    'To call again',
-    'Appt date given',
-    'Refuse',
-    'No answer',
-    'WhatsApp sent',
-    'Wrong number',
-    'Out of service'
+    'refuse',
+    'to call again',
+    'appt given',
+    'not contacted yet',
+    'done pekab40'
   ];
+
+  const formatRemarkOption = (option: string) => {
+    if (!option) return '';
+    const o = option.trim().toLowerCase();
+    if (o === 'done pekab40') return 'Done PeKaB40';
+    if (o === 'appt given') return 'Appt Given';
+    return o.replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const handleUpdateRemarks = async (patientId: string, newRemarks: string) => {
+    try {
+      const docRef = doc(db, 'peka_b40_patients', patientId);
+      await setDoc(docRef, { remarks: newRemarks }, { merge: true });
+      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, remarks: newRemarks } : p));
+      toast.success("Status updated successfully in database!");
+    } catch (error: any) {
+      console.error("Failed to update status:", error);
+      toast.error(`Failed to update status: ${error.message}`);
+    }
+  };
 
   // Load firestore data on mount
   useEffect(() => {
@@ -605,23 +621,23 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   const paginatedPatients = filteredPatients.slice(startIndex, startIndex + itemsPerPage);
 
   const getStatusBadgeClass = (status: string) => {
-    const s = String(status).trim();
-    if (s === 'Appt date given') {
-      return 'bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    const s = String(status || '').trim().toLowerCase();
+    if (s === 'appt given' || s === 'appt date given') {
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
-    if (s === 'Call not answered' || s === 'No answer') {
-      return 'bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    if (s === 'done pekab40') {
+      return 'bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
-    if (s === 'To call again' || s === 'WhatsApp sent') {
-      return 'bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    if (s === 'to call again' || s === 'whatsapp sent') {
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
-    if (s === 'Not contacted yet') {
-      return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    if (s === 'not contacted yet') {
+      return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
-    if (s === 'Refuse') {
-      return 'bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    if (s === 'refuse') {
+      return 'bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
-    return 'bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase inline-flex items-center gap-1';
+    return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
   };
 
   return (
@@ -688,7 +704,10 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-widest block">Appointments Set</span>
             <span className="text-3xl font-black text-emerald-600 block mt-1">
-              {patients.filter(p => p.remarks === 'Appt date given').length}
+              {patients.filter(p => {
+                const s = String(p.remarks || '').trim().toLowerCase();
+                return s === 'appt given' || s === 'appt date given';
+              }).length}
             </span>
           </div>
           <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center">
@@ -699,7 +718,10 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-widest block font-sans">To Call Again</span>
             <span className="text-3xl font-black text-indigo-600 block mt-1 font-sans">
-              {patients.filter(p => p.remarks === 'To call again' || p.remarks === 'Not contacted yet').length}
+              {patients.filter(p => {
+                const s = String(p.remarks || '').trim().toLowerCase();
+                return s === 'to call again' || s === 'not contacted yet' || s === '';
+              }).length}
             </span>
           </div>
           <div className="w-12 h-12 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center">
@@ -710,7 +732,10 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Closed / Refused</span>
             <span className="text-3xl font-black text-rose-600 block mt-1">
-              {patients.filter(p => p.remarks === 'Call not answered' || p.remarks === 'Refuse' || p.remarks === 'No answer').length}
+              {patients.filter(p => {
+                const s = String(p.remarks || '').trim().toLowerCase();
+                return s === 'refuse' || s === 'call not answered' || s === 'no answer';
+              }).length}
             </span>
           </div>
           <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center">
@@ -766,7 +791,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
             >
               <option value="All">All Statuses</option>
               {remarksOptions.map(option => (
-                <option key={option} value={option}>{option}</option>
+                <option key={option} value={option}>{formatRemarkOption(option)}</option>
               ))}
             </select>
           </div>
@@ -847,9 +872,25 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                       )}
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
-                      <span className={getStatusBadgeClass(p.remarks)}>
-                        {p.remarks || 'Not contacted yet'}
-                      </span>
+                      <select
+                        value={String(p.remarks || 'not contacted yet').trim().toLowerCase()}
+                        onChange={(e) => handleUpdateRemarks(p.id, e.target.value)}
+                        className={cn(
+                          getStatusBadgeClass(p.remarks || 'not contacted yet'),
+                          "cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-wide"
+                        )}
+                      >
+                        {remarksOptions.map(option => (
+                          <option key={option} value={option} className="bg-white text-slate-800 normal-case font-semibold">
+                            {formatRemarkOption(option)}
+                          </option>
+                        ))}
+                        {p.remarks && !remarksOptions.includes(String(p.remarks).trim().toLowerCase()) && (
+                          <option value={p.remarks} className="bg-white text-slate-800 normal-case font-semibold">
+                            {p.remarks}
+                          </option>
+                        )}
+                      </select>
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600 font-mono">
                       {p.time || '-'}
@@ -1039,7 +1080,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                     className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
                   >
                     {remarksOptions.map(option => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option}>{formatRemarkOption(option)}</option>
                     ))}
                   </select>
                 </div>
@@ -1210,7 +1251,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                     className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-indigo-600 outline-none"
                   >
                     {remarksOptions.map(option => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option}>{formatRemarkOption(option)}</option>
                     ))}
                   </select>
                 </div>
