@@ -288,6 +288,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState('All');
   const [remarksFilter, setRemarksFilter] = useState('All');
+  const [postcodeFilter, setPostcodeFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
@@ -867,8 +868,9 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       patientIdStr.includes(searchLower);
       
     const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
+    const matchesPostcode = postcodeFilter === 'All' || String(p.postalCode || '').trim() === postcodeFilter;
     
-    return matchesSearch && matchesBranch;
+    return matchesSearch && matchesBranch && matchesPostcode;
   });
 
   const filteredPatients = patients.filter(p => {
@@ -886,13 +888,22 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       
     const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
     const matchesRemarks = remarksFilter === 'All' || p.remarks === remarksFilter;
+    const matchesPostcode = postcodeFilter === 'All' || String(p.postalCode || '').trim() === postcodeFilter;
     
-    return matchesSearch && matchesBranch && matchesRemarks;
+    return matchesSearch && matchesBranch && matchesRemarks && matchesPostcode;
   });
 
   const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedPatients = filteredPatients.slice(startIndex, startIndex + itemsPerPage);
+
+  const uniquePostcodes = Array.from(
+    new Set(
+      patients
+        .map(p => String(p.postalCode || '').trim())
+        .filter(Boolean)
+    )
+  ).sort();
 
   const getStatusBadgeClass = (status: string) => {
     const s = String(status || '').trim().toLowerCase();
@@ -979,7 +990,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         {/* Not Contacted Yet */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Belum Dihubungi</span>
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Not Contacted Yet</span>
             <span className="text-3xl font-black text-slate-700 block mt-1">
               {statsBaseList.filter(p => p.remarks === 'not contacted yet').length}
             </span>
@@ -1078,6 +1089,23 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
               <option value="All">All Statuses</option>
               {remarksOptions.map(option => (
                 <option key={option} value={option}>{formatRemarkOption(option)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs text-slate-400 font-extrabold uppercase tracking-wider whitespace-nowrap hidden lg:inline">Poskod:</span>
+            <select
+              value={postcodeFilter}
+              onChange={(e) => {
+                setPostcodeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full sm:w-36 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-xs font-bold rounded-xl outline-none transition-colors"
+            >
+              <option value="All">All Poskod</option>
+              {uniquePostcodes.map(pc => (
+                <option key={pc} value={pc}>{pc}</option>
               ))}
             </select>
           </div>
