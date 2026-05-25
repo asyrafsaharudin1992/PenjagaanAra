@@ -165,7 +165,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
         let combinedRemarks = c.remarks || '';
         if (parsedRegistry) {
           if (parsedRegistry?.type === 'NCD') {
-            const ncdDetails = `[NCD] Last Blood Test: ${parsedRegistry.lastBloodTest || '-'} | Next: ${parsedRegistry.nextBloodTestDue || '-'} | Meds: ${parsedRegistry.medication || '-'} | Refill: ${parsedRegistry.refillStatus || '-'} | Compliance: ${parsedRegistry.compliance || '-'}`;
+            const ncdDetails = `[NCD] Last Blood Test: ${parsedRegistry.lastBloodTest || '-'} | Next: ${parsedRegistry.nextBloodTestDue || '-'} | Meds: ${parsedRegistry.medication || '-'} | Refill Status: ${parsedRegistry.refillStatus || '-'} | Refill Meds Date: ${parsedRegistry.refillMedsDate || '-'} | Compliance: ${parsedRegistry.compliance || '-'}`;
             combinedRemarks = combinedRemarks ? `${combinedRemarks}\n${ncdDetails}` : ncdDetails;
           } else if (parsedRegistry?.type === 'ANC') {
             const ancDetails = `[ANC] GA: ${parsedRegistry.gaWeeks || '-'} | Supplement: ${parsedRegistry.supplementGiven || '-'} | Compliance: ${parsedRegistry.compliance || '-'} | Risk: ${parsedRegistry.riskCategory || '-'}`;
