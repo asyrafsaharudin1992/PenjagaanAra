@@ -206,5 +206,9 @@ service cloud.firestore {
     match /test/connection {
       allow read: if true;
     }
+
+    match /peka_b40_patients/{patientId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
   }
 }
