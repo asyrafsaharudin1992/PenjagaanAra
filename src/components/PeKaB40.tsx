@@ -93,6 +93,155 @@ interface ImportedPatient {
   rawData: any;
 }
 
+const InlineDateCell = ({
+  patientId,
+  initialValue,
+  onSave,
+}: {
+  patientId: string;
+  initialValue: string;
+  onSave: (id: string, field: string, val: string) => Promise<void>;
+}) => {
+  const [val, setVal] = useState(initialValue || '');
+
+  useEffect(() => {
+    setVal(initialValue || '');
+  }, [initialValue]);
+
+  return (
+    <div className="relative flex items-center gap-1.5 bg-slate-50 border border-slate-200 hover:border-slate-350 focus-within:border-indigo-600 focus-within:bg-white rounded-xl px-2 py-1 transition-all">
+      <Calendar className="w-3.5 h-3.5 text-slate-400 pointer-events-none shrink-0" />
+      <input
+        type="date"
+        value={val}
+        onChange={(e) => {
+          const newVal = e.target.value;
+          setVal(newVal);
+          onSave(patientId, 'appointmentDate', newVal);
+        }}
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker();
+          } catch (err) {}
+        }}
+        className="w-full bg-transparent text-xs text-slate-800 font-bold focus:outline-none cursor-pointer"
+      />
+    </div>
+  );
+};
+
+const InlineTimeCell = ({
+  patientId,
+  initialValue,
+  onSave,
+}: {
+  patientId: string;
+  initialValue: string;
+  onSave: (id: string, field: string, val: string) => Promise<void>;
+}) => {
+  const [val, setVal] = useState(initialValue || '');
+
+  useEffect(() => {
+    setVal(initialValue || '');
+  }, [initialValue]);
+
+  const timeOptions = [
+    '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+    '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+    '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM'
+  ];
+
+  return (
+    <select
+      value={val}
+      onChange={(e) => {
+        const newVal = e.target.value;
+        setVal(newVal);
+        onSave(patientId, 'time', newVal);
+      }}
+      className="px-2 py-1.5 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 rounded-xl outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/30"
+    >
+      <option value="">- Time -</option>
+      {timeOptions.map(t => (
+        <option key={t} value={t}>{t}</option>
+      ))}
+      {val && !timeOptions.includes(val) && (
+        <option value={val}>{val}</option>
+      )}
+    </select>
+  );
+};
+
+const InlineBranchCell = ({
+  patientId,
+  initialValue,
+  onSave,
+}: {
+  patientId: string;
+  initialValue: string;
+  onSave: (id: string, field: string, val: string) => Promise<void>;
+}) => {
+  const [val, setVal] = useState(initialValue || 'Kajang');
+
+  useEffect(() => {
+    setVal(initialValue || 'Kajang');
+  }, [initialValue]);
+
+  return (
+    <select
+      value={val}
+      onChange={(e) => {
+        const newVal = e.target.value;
+        setVal(newVal);
+        onSave(patientId, 'branch', newVal);
+      }}
+      className="px-2.5 py-1 text-[11px] font-black tracking-wide uppercase text-slate-700 bg-slate-100 border border-slate-200 rounded-xl outline-none cursor-pointer hover:bg-slate-200 transition-colors focus:bg-white focus:border-indigo-600"
+    >
+      <option value="Kajang">Kajang</option>
+      <option value="Seri Kembangan">Seri Kembangan</option>
+      <option value="Semenyih">Semenyih</option>
+    </select>
+  );
+};
+
+const InlineNotesCell = ({
+  patientId,
+  initialValue,
+  onSave,
+}: {
+  patientId: string;
+  initialValue: string;
+  onSave: (id: string, field: string, val: string) => Promise<void>;
+}) => {
+  const [val, setVal] = useState(initialValue || '');
+
+  useEffect(() => {
+    setVal(initialValue || '');
+  }, [initialValue]);
+
+  const handleBlur = () => {
+    if (val !== (initialValue || '')) {
+      onSave(patientId, 'additionalNotes', val);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      value={val}
+      placeholder="Add note..."
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.currentTarget.blur();
+        }
+      }}
+      className="w-full min-w-[170px] max-w-[250px] text-xs text-slate-700 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 focus:bg-white focus:border-indigo-600 border border-slate-200 rounded-xl py-1 px-3 outline-none transition-all font-medium"
+    />
+  );
+};
+
 export default function PeKaB40({ currentUser }: PeKaB40Props) {
   // Local Database patients loaded from Firestore
   const [patients, setPatients] = useState<PeKaPatient[]>([]);
@@ -222,6 +371,29 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     } catch (error: any) {
       console.error("Failed to update status:", error);
       toast.error(`Failed to update status: ${error.message}`);
+    }
+  };
+
+  const handleUpdateField = async (patientId: string, field: string, value: string) => {
+    try {
+      const docRef = doc(db, 'peka_b40_patients', patientId);
+      await setDoc(docRef, { [field]: value }, { merge: true });
+      
+      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, [field]: value } : p));
+      
+      const p = patients.find(pat => pat.id === patientId);
+      const name = p ? p.name : 'Patient';
+
+      let displayField = field;
+      if (field === 'appointmentDate') displayField = 'Appointment Date';
+      if (field === 'time') displayField = 'Time';
+      if (field === 'branch') displayField = 'Cawangan';
+      if (field === 'additionalNotes') displayField = 'Additional Notes';
+
+      toast.success(`Updated ${displayField} for ${name} to "${value || '-'}"`);
+    } catch (error: any) {
+      console.error(`Failed to update ${field}:`, error);
+      toast.error(`Failed to update ${field}: ${error.message}`);
     }
   };
 
@@ -824,6 +996,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
               <option value="All">All Cawangan</option>
               <option value="Kajang">Kajang</option>
               <option value="Seri Kembangan">Seri Kembangan</option>
+              <option value="Semenyih">Semenyih</option>
             </select>
           </div>
 
@@ -910,14 +1083,11 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                       {p.postalCode || '-'}
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
-                      {p.appointmentDate ? (
-                        <span className="flex items-center gap-1.5 text-slate-800 font-semibold text-xs">
-                          <Calendar className="w-3.5 h-3.5 text-indigo-950 shrink-0" />
-                          {p.appointmentDate}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400 font-normal italic">-</span>
-                      )}
+                      <InlineDateCell
+                        patientId={p.id}
+                        initialValue={p.appointmentDate}
+                        onSave={handleUpdateField}
+                      />
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <select
@@ -940,18 +1110,26 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                         )}
                       </select>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600 font-mono">
-                      {p.time || '-'}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <InlineTimeCell
+                        patientId={p.id}
+                        initialValue={p.time}
+                        onSave={handleUpdateField}
+                      />
                     </td>
                     <td className="px-5 py-4">
-                      <p className="text-xs text-slate-400 truncate max-w-[150px] italic font-medium" title={p.additionalNotes}>
-                        {p.additionalNotes || '-'}
-                      </p>
+                      <InlineNotesCell
+                        patientId={p.id}
+                        initialValue={p.additionalNotes}
+                        onSave={handleUpdateField}
+                      />
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
-                      <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 rounded px-2.5 py-0.5">
-                        {p.branch || 'Kajang'}
-                      </span>
+                      <InlineBranchCell
+                        patientId={p.id}
+                        initialValue={p.branch}
+                        onSave={handleUpdateField}
+                      />
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -1115,6 +1293,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                   >
                     <option value="Kajang">Kajang</option>
                     <option value="Seri Kembangan">Seri Kembangan</option>
+                    <option value="Semenyih">Semenyih</option>
                   </select>
                 </div>
               </div>
@@ -1286,6 +1465,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                   >
                     <option value="Kajang">Kajang</option>
                     <option value="Seri Kembangan">Seri Kembangan</option>
+                    <option value="Semenyih">Semenyih</option>
                   </select>
                 </div>
               </div>
