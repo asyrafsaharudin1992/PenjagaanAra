@@ -144,13 +144,6 @@ export default function App() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Staff Role Tab Restriction
-  useEffect(() => {
-    if (user?.role === 'Staff' && activeTab !== 'peka_b40') {
-      setActiveTab('peka_b40');
-    }
-  }, [user, activeTab]);
-
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -158,12 +151,7 @@ export default function App() {
         const isSuperEmail = SUPERADMIN_EMAILS.has(firebaseUser.email ?? '');
 
         // FIX 1 – Slow login
-        // Previously setLoading(false) only ran AFTER getDoc() completed,
-        // gating the entire UI behind a sequential Firestore cold-start round-
-        // trip (up to 2-4 s on first load). Now we unblock the UI immediately
-        // with a minimal placeholder built from the already-resolved Firebase
-        // Auth object, then patch in the full Firestore profile in the
-        // background once it arrives.
+        // ...
         const placeholder: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -194,15 +182,20 @@ export default function App() {
 
           if (userDoc.exists()) {
             const raw = userDoc.data() as UserProfile;
-            // Only normalize if a branch is actually stored — don't assign a
-            // default branch, otherwise users with no branch silently inherit Kajang.
+            // ...
             const normalized = normalizeBranch(raw.branch);
             if (normalized) raw.branch = normalized as any;
             if (!raw.email) raw.email = firebaseUser.email || '';
             // enforceRole applies FIX 4: strips Superadmin from wrong emails
-            setUser(enforceRole(raw, firebaseUser.email));
+            const updatedUser = enforceRole(raw, firebaseUser.email);
+            setUser(updatedUser);
+            
+            // Set default tab for Staff
+            if (updatedUser.role === 'Staff') {
+              setActiveTab('peka_b40');
+            }
           } else {
-            // No Firestore doc yet — create one with safe defaults.
+            // ...
             const newProfile: UserProfile = isSuperEmail
               ? {
                   uid: firebaseUser.uid,
@@ -223,6 +216,11 @@ export default function App() {
                 };
             await setDoc(userDocRef, newProfile);
             setUser(newProfile);
+            
+             // Set default tab for Staff
+            if (newProfile.role === 'Staff') {
+              setActiveTab('peka_b40');
+            }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
