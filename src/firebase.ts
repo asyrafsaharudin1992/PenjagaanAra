@@ -10,7 +10,7 @@ import {
   browserLocalPersistence
 } from 'firebase/auth';
 import { 
-  getFirestore, 
+  initializeFirestore, 
   doc, 
   getDoc, 
   setDoc, 
@@ -27,12 +27,14 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
+const config = firebaseConfig as any;
+
 // Explicitly check configuration
-if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+if (!config.apiKey || !config.projectId) {
   console.error("Firebase Configuration is missing critical fields. Please check your setup in firebase-applet-config.json.");
 } else {
-  console.log(`Connecting to Firebase Project: ${firebaseConfig.projectId}`);
-  console.log(`Using Firestore Database ID: ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
+  console.log(`Connecting to Firebase Project: ${config.projectId}`);
+  console.log(`Using Firestore Database ID: ${config.firestoreDatabaseId || '(default)'}`);
 }
 
 const app = initializeApp(firebaseConfig);
@@ -43,8 +45,10 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error("Auth persistence error:", error);
 });
 
-// Initialize Firestore with a default timeout hint
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with long polling enabled to bypass corporate firewalls/proxies
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, config.firestoreDatabaseId || undefined);
 
 /**
  * Enable Offline Persistence for Firestore
