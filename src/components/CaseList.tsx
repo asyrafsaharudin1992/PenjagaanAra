@@ -382,6 +382,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
             </select>
           )}
           <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-500 hidden sm:inline-block">Key-in date:</span>
             <input
               type="date"
               value={startDate}
