@@ -26,6 +26,8 @@ import { Toaster, toast } from 'sonner';
 import WellnessForm from './components/WellnessForm';
 import CSVImport from './components/CSVImport';
 import PatientList from './components/PatientList';
+import PeKaB40 from './components/PeKaB40';
+import { setCachedGoogleToken } from './lib/googleAuthCache';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIX 4 – Superadmin role escalation
@@ -320,7 +322,13 @@ export default function App() {
     setLoginError(null);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setCachedGoogleToken(credential.accessToken);
+        toast.success("Signed in and connected with Google Sheets!");
+      }
     } catch (error: any) {
       console.error("Google Login failed:", error);
       if (error.code === 'auth/popup-blocked') {
@@ -335,7 +343,10 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => {
+    setCachedGoogleToken(null);
+    signOut(auth);
+  };
 
   const handleAddCase = async (newCase: Partial<FollowUpCase>) => {
     try {
@@ -620,6 +631,7 @@ export default function App() {
                 <PatientList currentUser={user} />
               </div>
             )}
+            {activeTab === 'peka_b40' && <PeKaB40 currentUser={user} />}
             {activeTab === 'users' && <UserManagement currentUser={user} />}
           </div>
 
