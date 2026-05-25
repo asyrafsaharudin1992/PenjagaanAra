@@ -1268,8 +1268,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
             <table className="w-full text-left min-w-[1000px] border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200">
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-32">IC</th>
+                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name & IC</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">PostalCode</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-40">Next Appointment Date</th>
                   <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-32">Remarks</th>
@@ -1283,12 +1282,14 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                 {paginatedPatients.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
                     <td className="px-5 py-4">
-                      <p className="text-sm font-bold text-slate-900 uppercase truncate max-w-[160px]" title={p.name}>
+                      <p className="text-sm font-bold text-slate-900 uppercase break-words min-w-[200px]" title={p.name}>
                         {p.name}
                       </p>
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-600 font-mono">
-                      {p.ic || '-'}
+                      {p.ic && (
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">
+                          IC: {p.ic}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500 font-mono">
                       {p.postalCode || '-'}
