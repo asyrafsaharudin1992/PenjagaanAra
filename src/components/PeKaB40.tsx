@@ -853,6 +853,24 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     document.body.removeChild(link);
   };
 
+  const statsBaseList = patients.filter(p => {
+    const nameStr = String(p.name || '').toLowerCase();
+    const icStr = String(p.ic || '');
+    const phoneStr = String(p.phone || '');
+    const patientIdStr = String(p.patientId || '').toLowerCase();
+    const searchLower = (searchTerm || '').toLowerCase();
+
+    const matchesSearch = 
+      nameStr.includes(searchLower) ||
+      icStr.includes(searchLower) ||
+      phoneStr.includes(searchLower) ||
+      patientIdStr.includes(searchLower);
+      
+    const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
+    
+    return matchesSearch && matchesBranch;
+  });
+
   const filteredPatients = patients.filter(p => {
     const nameStr = String(p.name || '').toLowerCase();
     const icStr = String(p.ic || '');
@@ -946,55 +964,66 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       </div>
 
       {/* Quick stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 md:grid-cols-3 gap-4">
+        {/* Total Records */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Total Records</span>
-            <span className="text-3xl font-black text-slate-900 block mt-1">{patients.length}</span>
+            <span className="text-3xl font-black text-slate-900 block mt-1">{statsBaseList.length}</span>
           </div>
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-950 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-slate-50 text-slate-750 border border-slate-100 rounded-xl flex items-center justify-center shrink-0">
             <Users className="w-6 h-6" />
           </div>
         </div>
+
+        {/* Not Contacted Yet */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Belum Dihubungi</span>
+            <span className="text-3xl font-black text-slate-700 block mt-1">
+              {statsBaseList.filter(p => p.remarks === 'not contacted yet').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-slate-50 text-slate-650 border border-slate-100 rounded-xl flex items-center justify-center shrink-0">
+            <User className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* Appointments Set */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-widest block">Appointments Set</span>
             <span className="text-3xl font-black text-emerald-600 block mt-1">
-              {patients.filter(p => {
-                const s = String(p.remarks || '').trim().toLowerCase();
-                return s === 'appt given' || s === 'appt date given';
-              }).length}
+              {statsBaseList.filter(p => p.remarks === 'appt given').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center shrink-0">
             <Calendar className="w-6 h-6" />
           </div>
         </div>
+
+        {/* To Call Again */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-widest block font-sans">To Call Again</span>
             <span className="text-3xl font-black text-indigo-600 block mt-1 font-sans">
-              {patients.filter(p => {
-                const s = String(p.remarks || '').trim().toLowerCase();
-                return s === 'to call again' || s === 'not contacted yet' || s === '';
-              }).length}
+              {statsBaseList.filter(p => p.remarks === 'to call again').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center shrink-0">
             <Clock className="w-6 h-6" />
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+
+        {/* Closed / Refused */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between col-span-2 md:col-span-1">
           <div>
             <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Closed / Refused</span>
             <span className="text-3xl font-black text-rose-600 block mt-1">
-              {patients.filter(p => {
-                const s = String(p.remarks || '').trim().toLowerCase();
-                return s === 'refuse' || s === 'call not answered' || s === 'no answer';
-              }).length}
+              {statsBaseList.filter(p => p.remarks === 'refuse').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center shrink-0">
             <AlertCircle className="w-6 h-6" />
           </div>
         </div>
@@ -1156,7 +1185,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                             href={getWhatsAppLink(p.phone, getWhatsAppMessage(p))}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1 px-2 bg-emerald-650 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+                            className="p-1 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
                             title="Send WhatsApp Message"
                           >
                             <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
