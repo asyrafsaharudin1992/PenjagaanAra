@@ -14,7 +14,7 @@ interface CalendarEvent {
   date: string; // YYYY-MM-DD
   title: string;
   subtitle: string;
-  type: 'appointment' | 'blood_test' | 'todo' | 'note';
+  type: 'appointment' | 'blood_test' | 'todo' | 'note' | 'refill_meds';
   originalDate: Date;
 }
 
@@ -65,15 +65,27 @@ export default function CalendarView({ user }: CalendarViewProps) {
         if (data.registryData) {
           try {
             const parsed = typeof data.registryData === 'string' ? JSON.parse(data.registryData) : data.registryData;
-            if (parsed && parsed.type === 'NCD' && parsed.nextBloodTestDue) {
-               events.push({
-                 id: `blood-${caseId}`,
-                 date: parsed.nextBloodTestDue,
-                 title: `Blood Test: ${patientName} (${data.branch || '-'})`,
-                 subtitle: `Diagnosis: ${data.diagnosis || '-'}`,
-                 type: 'blood_test',
-                 originalDate: new Date(parsed.nextBloodTestDue)
-               });
+            if (parsed && parsed.type === 'NCD') {
+              if (parsed.nextBloodTestDue) {
+                 events.push({
+                   id: `blood-${caseId}`,
+                   date: parsed.nextBloodTestDue,
+                   title: `Blood Test: ${patientName} (${data.branch || '-'})`,
+                   subtitle: `Diagnosis: ${data.diagnosis || '-'}`,
+                   type: 'blood_test',
+                   originalDate: new Date(parsed.nextBloodTestDue)
+                 });
+              }
+              if (parsed.refillMedsDate) {
+                 events.push({
+                   id: `refill-${caseId}`,
+                   date: parsed.refillMedsDate,
+                   title: `Refill Meds: ${patientName} (${data.branch || '-'})`,
+                   subtitle: `Medication: ${parsed.medication || '-'}`,
+                   type: 'refill_meds',
+                   originalDate: new Date(parsed.refillMedsDate)
+                 });
+              }
             }
           } catch(e) { }
         }
@@ -204,6 +216,7 @@ export default function CalendarView({ user }: CalendarViewProps) {
     switch (type) {
       case 'appointment': return <Stethoscope className="w-4 h-4 text-indigo-500" />;
       case 'blood_test': return <Activity className="w-4 h-4 text-rose-500" />;
+      case 'refill_meds': return <Activity className="w-4 h-4 text-sky-500" />;
       case 'todo': return <CheckSquare className="w-4 h-4 text-amber-500" />;
       case 'note': return <StickyNote className="w-4 h-4 text-teal-500" />;
       default: return <Clock className="w-4 h-4 text-slate-500" />;
@@ -248,6 +261,7 @@ export default function CalendarView({ user }: CalendarViewProps) {
             const dayEvents = getDayEvents(day);
             const hasAppt = dayEvents.some(e => e.type === 'appointment');
             const hasBlood = dayEvents.some(e => e.type === 'blood_test');
+            const hasRefill = dayEvents.some(e => e.type === 'refill_meds');
             const hasTodo = dayEvents.some(e => e.type === 'todo');
             const hasNote = dayEvents.some(e => e.type === 'note');
 
@@ -274,6 +288,7 @@ export default function CalendarView({ user }: CalendarViewProps) {
                 <div className="flex flex-wrap justify-center gap-1 mt-auto">
                   {hasAppt && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" title="Appointment"></div>}
                   {hasBlood && <div className="w-1.5 h-1.5 rounded-full bg-rose-500" title="Blood Test"></div>}
+                  {hasRefill && <div className="w-1.5 h-1.5 rounded-full bg-sky-500" title="Refill Meds"></div>}
                   {hasTodo && <div className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Todo"></div>}
                   {hasNote && <div className="w-1.5 h-1.5 rounded-full bg-teal-500" title="Note"></div>}
                 </div>
@@ -285,6 +300,7 @@ export default function CalendarView({ user }: CalendarViewProps) {
         <div className="mt-8 flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-500 pt-6 border-t border-slate-100">
           <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-500"></div> Appointment</div>
           <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-rose-500"></div> Blood Test</div>
+          <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-sky-500"></div> Refill Meds</div>
           <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div> Todo List</div>
           <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Note Reminder</div>
         </div>
