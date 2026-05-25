@@ -157,6 +157,49 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     'done pekab40'
   ];
 
+  const normalizeRemarks = (remarks: string | null | undefined): string => {
+    if (!remarks) return 'not contacted yet';
+    const clean = remarks.trim().toLowerCase();
+    
+    if (clean === 'refuse' || clean.includes('refuse') || clean.includes('tolak')) {
+      return 'refuse';
+    }
+    if (clean === 'done pekab40' || clean.includes('done') || clean.includes('siap') || clean.includes('selesai')) {
+      return 'done pekab40';
+    }
+    if (
+      clean === 'appt given' || 
+      clean === 'appt date given' || 
+      clean.includes('appt') || 
+      clean.includes('appointment') || 
+      clean.includes('temujanji') || 
+      clean.includes('date given')
+    ) {
+      return 'appt given';
+    }
+    if (
+      clean === 'to call again' || 
+      clean.includes('call again') || 
+      clean.includes('hubungi semula') || 
+      clean.includes('not answered') || 
+      clean.includes('no answer') || 
+      clean.includes('whatsapp') || 
+      clean.includes('wrong number') || 
+      clean.includes('out of service') || 
+      clean.includes('contact again')
+    ) {
+      return 'to call again';
+    }
+    if (clean.includes('not contacted') || clean.includes('belum hubung') || clean.includes('belum')) {
+      return 'not contacted yet';
+    }
+    
+    const matched = remarksOptions.find(opt => clean.includes(opt));
+    if (matched) return matched;
+
+    return 'not contacted yet';
+  };
+
   const formatRemarkOption = (option: string) => {
     if (!option) return '';
     const o = option.trim().toLowerCase();
@@ -167,10 +210,15 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
 
   const handleUpdateRemarks = async (patientId: string, newRemarks: string) => {
     try {
+      const normRemarks = normalizeRemarks(newRemarks);
       const docRef = doc(db, 'peka_b40_patients', patientId);
-      await setDoc(docRef, { remarks: newRemarks }, { merge: true });
-      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, remarks: newRemarks } : p));
-      toast.success("Status updated successfully in database!");
+      await setDoc(docRef, { remarks: normRemarks }, { merge: true });
+      
+      const p = patients.find(pat => pat.id === patientId);
+      const name = p ? p.name : 'Patient';
+
+      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, remarks: normRemarks } : p));
+      toast.success(`Updated status for ${name} to "${formatRemarkOption(normRemarks)}"`);
     } catch (error: any) {
       console.error("Failed to update status:", error);
       toast.error(`Failed to update status: ${error.message}`);
@@ -201,7 +249,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           address: data.address || '',
           postalCode: data.postalCode || '',
           appointmentDate: data.appointmentDate || '',
-          remarks: data.remarks || 'Not contacted yet',
+          remarks: normalizeRemarks(data.remarks),
           time: data.time || '',
           additionalNotes: data.additionalNotes || '',
           branch: data.branch || 'Kajang',
@@ -238,7 +286,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         address: formAddress.trim(),
         postalCode: formPostalCode.trim(),
         appointmentDate: formApptDate,
-        remarks: formRemarks,
+        remarks: normalizeRemarks(formRemarks),
         time: formTime.trim(),
         additionalNotes: formNotes.trim(),
         branch: formBranch,
@@ -284,7 +332,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         address: formAddress.trim(),
         postalCode: formPostalCode.trim(),
         appointmentDate: formApptDate,
-        remarks: formRemarks,
+        remarks: normalizeRemarks(formRemarks),
         time: formTime.trim(),
         additionalNotes: formNotes.trim(),
         branch: formBranch,
@@ -327,7 +375,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     setFormAddress(p.address);
     setFormPostalCode(p.postalCode);
     setFormApptDate(p.appointmentDate);
-    setFormRemarks(p.remarks || 'Not contacted yet');
+    setFormRemarks(normalizeRemarks(p.remarks));
     setFormTime(p.time);
     setFormNotes(p.additionalNotes);
     setFormBranch(p.branch || 'Kajang');
@@ -342,7 +390,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     setFormAddress('');
     setFormPostalCode('');
     setFormApptDate('');
-    setFormRemarks('Not contacted yet');
+    setFormRemarks('not contacted yet');
     setFormTime('');
     setFormNotes('');
     setFormBranch(currentUser.branch || 'Kajang');
@@ -485,7 +533,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           address: val('address'),
           postalCode: val('postalCode'),
           appointmentDate: val('appointmentDate'),
-          remarks: val('remarks') || 'Not contacted yet',
+          remarks: normalizeRemarks(val('remarks')),
           time: val('time'),
           additionalNotes: val('additionalNotes'),
           branch: val('branch') || currentUser.branch || 'Kajang',
@@ -557,7 +605,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
             address: patient.address,
             postalCode: patient.postalCode,
             appointmentDate: patient.appointmentDate,
-            remarks: patient.remarks || 'Not contacted yet',
+            remarks: normalizeRemarks(patient.remarks),
             time: patient.time,
             additionalNotes: patient.additionalNotes,
             branch: patient.branch,
@@ -886,7 +934,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                           </option>
                         ))}
                         {p.remarks && !remarksOptions.includes(String(p.remarks).trim().toLowerCase()) && (
-                          <option value={p.remarks} className="bg-white text-slate-800 normal-case font-semibold">
+                          <option value={String(p.remarks).trim().toLowerCase()} className="bg-white text-slate-800 normal-case font-semibold">
                             {p.remarks}
                           </option>
                         )}
