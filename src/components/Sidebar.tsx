@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, ClipboardList, Settings, LogOut, User as UserIcon, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, LogOut, User as UserIcon, MessageSquare, Calendar } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { UserProfile, UserPermission } from '../types';
 
@@ -13,6 +13,7 @@ interface SidebarProps {
 export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'view_dashboard' as UserPermission, tooltip: "Overview of clinic activity" },
+    { id: 'calendar', label: 'Calendar', icon: Calendar, permission: 'view_history' as UserPermission, tooltip: "View upcoming appointments and reminders" },
     { id: 'cases', label: 'Follow-up Cases', icon: ClipboardList, permission: 'view_history' as UserPermission, tooltip: "Cases that have already been followed up" },
     { id: 'todo', label: 'To Do List', icon: ClipboardList, permission: 'view_history' as UserPermission, tooltip: "Reminders and Doctor's requests" },
     { id: 'patients', label: 'Patients', icon: Users, permission: 'view_history' as UserPermission, tooltip: "List of patients who need follow-up but have not yet been contacted" },
