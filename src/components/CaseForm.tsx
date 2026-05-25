@@ -27,6 +27,7 @@ interface NCDFields {
   medication: string;
   refillStatus: string;
   compliance: string;
+  refillMedsDate?: string;
 }
 
 const defaultANCFields: ANCFields = {
@@ -42,6 +43,7 @@ const defaultNCDFields: NCDFields = {
   medication: '',
   refillStatus: '',
   compliance: '',
+  refillMedsDate: '',
 };
 // --- END ADDED ---
 
@@ -612,14 +614,25 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Refill Status</p>
-                  <PillSelect
-                    options={['Done', 'Pending', 'Overdue']}
-                    value={ncdFields.refillStatus}
-                    onChange={(val) => setNcdFields({ ...ncdFields, refillStatus: val })}
-                    colorScheme="teal"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Refill Status</p>
+                    <PillSelect
+                      options={['Done', 'Pending', 'Overdue']}
+                      value={ncdFields.refillStatus}
+                      onChange={(val) => setNcdFields({ ...ncdFields, refillStatus: val })}
+                      colorScheme="teal"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-teal-600/80 uppercase tracking-wider">Refill Meds Date (Optional)</p>
+                    <input
+                      type="date"
+                      value={ncdFields.refillMedsDate || ''}
+                      onChange={(e) => setNcdFields({ ...ncdFields, refillMedsDate: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-teal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
