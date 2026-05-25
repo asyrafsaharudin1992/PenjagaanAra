@@ -17,6 +17,7 @@ import UserManagement from './components/UserManagement';
 import PublicFollowUpForm from './components/PublicFollowUpForm';
 import PublicRequestsList from './components/PublicRequestsList';
 import ErrorBoundary from './components/ErrorBoundary';
+import CalendarView from './components/CalendarView';
 import { FollowUpCase, UserProfile, UserRole } from './types';
 import { normalizeBranch } from './lib/utils';
 import { PlusCircle, LogIn, Loader2, ClipboardList, Lock, Mail, AlertCircle, Chrome, Upload } from 'lucide-react';
@@ -597,6 +598,7 @@ export default function App() {
             </div>
 
             {activeTab === 'dashboard' && <Dashboard cases={cases} userName={user.displayName} onFilterByTag={(tag) => { setTagFilter(tag); setActiveTab('cases'); }} />}
+            {activeTab === 'calendar' && <CalendarView user={user} />}
             {activeTab === 'cases' && user && <CaseList cases={cases} onViewCase={setSelectedCaseId} currentUser={user} tagFilter={tagFilter} setTagFilter={setTagFilter} />}
             {activeTab === 'todo' && <TodoList user={user} />}
             {activeTab === 'patients' && (
