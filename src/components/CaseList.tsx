@@ -283,11 +283,11 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Patient</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Diagnosis</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Visit Date</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Appt Date</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Doctor</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tag</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
@@ -300,9 +300,6 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                   className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
                   onClick={() => onViewCase(c.id)}
                 >
-                  <td className="px-4 py-3 text-xs font-medium text-slate-500 whitespace-nowrap">
-                    {new Date(c.createdAt).toLocaleDateString()}
-                  </td>
                   <td className="px-4 py-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -330,13 +327,18 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-xs text-slate-700 font-medium min-w-[200px] leading-relaxed whitespace-normal break-words">
-                      {c.diagnosis}
+                    <p className="text-xs text-slate-700 font-medium min-w-[200px] leading-relaxed whitespace-normal break-words max-w-[300px] line-clamp-2">
+                      {c.diagnosis || '-'}
                     </p>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 whitespace-nowrap">
                       {c.lastVisitDate ? new Date(c.lastVisitDate).toLocaleDateString() : '-'}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 whitespace-nowrap bg-indigo-50/50 px-2 py-1 rounded border border-indigo-100">
+                      {c.appointmentDate ? new Date(c.appointmentDate).toLocaleDateString() : '-'}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
