@@ -5,6 +5,7 @@ import { collection, addDoc, doc, setDoc, getDocs, query, where } from 'firebase
 import { toast } from 'sonner';
 import { FollowUpCase, UserProfile, ClinicBranch, FollowUpTag } from '../types';
 import { normalizeBranch, cn } from '../lib/utils';
+import Papa from 'papaparse';
 
 interface ImportedPatient {
   patientId: string;
@@ -106,37 +107,42 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      parseCSVHeaders(text);
-    };
-    reader.readAsText(file);
-  };
+    // Use PapaParse directly on the file
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.errors.length > 0) {
+          console.error("CSV parse errors:", results.errors);
+          const firstError = results.errors[0].message;
+          toast.error(`Error parsing CSV: ${firstError}`);
+          return;
+        }
+        
+        if (!results.data || results.data.length === 0) {
+          toast.error('CSV file is empty');
+          return;
+        }
 
-  const parseCSVHeaders = (text: string) => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length < 2) {
-      toast.error('CSV file is empty or invalid');
-      return;
-    }
+        const headers = results.meta.fields || [];
+        if (headers.length === 0) {
+          toast.error('Could not detect columns in CSV');
+          return;
+        }
 
-    const headers = lines[0].split(',').map(h => h.trim());
-    setCsvHeaders(headers);
-
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
-      const row: any = {};
-      headers.forEach((header, idx) => {
-        row[header] = values[idx] || '';
-      });
-      rows.push(row);
-    }
-    setCsvData(rows);
-    autoDetectMapping(headers);
-    setStep('mapping');
-    toast.success(`Loaded ${rows.length} rows from CSV`);
+        setCsvHeaders(headers);
+        setCsvData(results.data);
+        autoDetectMapping(headers);
+        setStep('mapping');
+        toast.success(`Loaded ${results.data.length} rows from CSV`);
+      },
+      error: (error) => {
+        toast.error(`Failed to read file: ${error.message}`);
+      }
+    });
+    
+    // Reset the input so the same file could be selected again
+    e.target.value = '';
   };
 
   const autoDetectMapping = (headers: string[]) => {
@@ -233,7 +239,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
         return {
           ...patient,
           isDuplicate,
-          isValid: missingFields.length === 0,
+          isValid: !missingFields.includes('Patient Name'),
           missingFields,
         };
       });
@@ -409,24 +415,68 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           {/* STEP 1: UPLOAD */}
           {step === 'upload' && (
-            <div className="text-center py-12">
+            <div 
+              className="text-center py-12 border-2 border-dashed border-slate-300 rounded-2xl hover:border-indigo-400 hover:bg-slate-50 transition-all cursor-pointer"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                  // Re-use logic
+                  Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                      if (results.errors.length > 0) {
+                        toast.error(`Error parsing CSV: ${results.errors[0].message}`);
+                        return;
+                      }
+                      if (!results.data || results.data.length === 0) {
+                        toast.error('CSV file is empty');
+                        return;
+                      }
+                      const headers = results.meta.fields || [];
+                      if (headers.length === 0) {
+                        toast.error('Could not detect columns in CSV');
+                        return;
+                      }
+                      setCsvHeaders(headers);
+                      setCsvData(results.data);
+                      autoDetectMapping(headers);
+                      setStep('mapping');
+                      toast.success(`Loaded ${results.data.length} rows from CSV`);
+                    },
+                    error: (error) => toast.error(`Failed to read file: ${error.message}`)
+                  });
+                }
+              }}
+              onClick={() => {
+                const el = document.getElementById('csv-upload-input');
+                if (el) el.click();
+              }}
+            >
               <div className="mx-auto w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
                 <FileText className="w-10 h-10 text-indigo-500" />
               </div>
               <h4 className="text-lg font-bold text-slate-900 mb-2">Upload Any CSV Format</h4>
               <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
-                Your CSV can have any column names. We'll help you map them in the next step!
+                Drag and drop your CSV file here, or click to browse. We'll help you map the columns next.
               </p>
-              <label className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-950 text-white rounded-lg font-medium hover:bg-slate-900 transition-colors cursor-pointer shadow-lg shadow-indigo-200">
+              <div className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-950 text-white rounded-lg font-medium hover:bg-slate-900 transition-colors shadow-lg shadow-indigo-200">
                 <Upload className="w-5 h-5" />
                 Choose CSV File
                 <input
+                  id="csv-upload-input"
                   type="file"
                   accept=".csv"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-              </label>
+              </div>
             </div>
           )}
 
