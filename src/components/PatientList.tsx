@@ -20,6 +20,10 @@ export default function PatientList({ currentUser }: PatientListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   // Modal states
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -100,10 +104,16 @@ export default function PatientList({ currentUser }: PatientListProps) {
     return matchesSearch && matchesBranch && matchesTag;
   });
 
-  // Reset page when filters change
+  // Reset page and selections when filters change
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedPatientIds([]);
   }, [searchTerm, branchFilter, tagFilter]);
+
+  // Reset selections when currentPage changes
+  useEffect(() => {
+    setSelectedPatientIds([]);
+  }, [currentPage]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
@@ -177,6 +187,31 @@ export default function PatientList({ currentUser }: PatientListProps) {
         toast.error(uiError.message);
       }
       setConfirmModal(prev => ({ ...prev, isProcessing: false }));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (!['Superadmin', 'Admin'].includes(currentUser.role)) {
+      toast.error("You don't have permission to delete patients.");
+      return;
+    }
+    setBulkDeleteModalOpen(true);
+  };
+
+  const executeBulkDelete = async () => {
+    setIsBulkDeleting(true);
+    try {
+      await Promise.all(
+        selectedPatientIds.map(id => deleteDoc(doc(db, 'patients', id)))
+      );
+      toast.success(`${selectedPatientIds.length} patients deleted successfully`);
+      setSelectedPatientIds([]);
+      setBulkDeleteModalOpen(false);
+    } catch (error: any) {
+      console.error("Bulk delete error:", error);
+      toast.error("Failed to delete some patients. Please try again.");
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -317,11 +352,53 @@ export default function PatientList({ currentUser }: PatientListProps) {
         </div>
       </div>
 
+      {['Superadmin', 'Admin'].includes(currentUser.role) && selectedPatientIds.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 px-6 py-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex flex-wrap items-center gap-2 text-rose-800 text-sm font-medium">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>Selected <b>{selectedPatientIds.length}</b> patients.</span>
+            {selectedPatientIds.length < filteredPatients.length && (
+              <button 
+                onClick={() => setSelectedPatientIds(filteredPatients.map(p => p.id))}
+                className="text-indigo-600 hover:text-indigo-800 hover:underline font-bold text-xs"
+              >
+                Select all {filteredPatients.length} patients in list
+              </button>
+            )}
+          </div>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm uppercase tracking-wider self-start sm:self-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            BULK DELETE
+          </button>
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
+                {['Superadmin', 'Admin'].includes(currentUser.role) && (
+                  <th className="w-12 px-6 py-4">
+                    <input 
+                      type="checkbox"
+                      checked={paginatedPatients.length > 0 && paginatedPatients.every(p => selectedPatientIds.includes(p.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const currentPageIds = paginatedPatients.map(p => p.id);
+                          setSelectedPatientIds(prev => Array.from(new Set([...prev, ...currentPageIds])));
+                        } else {
+                          const currentPageIds = paginatedPatients.map(p => p.id);
+                          setSelectedPatientIds(prev => prev.filter(id => !currentPageIds.includes(id)));
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Patient Details</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Import Tag</th>
@@ -330,9 +407,27 @@ export default function PatientList({ currentUser }: PatientListProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginatedPatients.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4">
+              {paginatedPatients.map((p) => {
+                const isSelected = selectedPatientIds.includes(p.id);
+                return (
+                  <tr key={p.id} className={cn("hover:bg-slate-50/50 transition-colors", isSelected && "bg-slate-50/80")}>
+                    {['Superadmin', 'Admin'].includes(currentUser.role) && (
+                      <td className="px-6 py-4 w-12">
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPatientIds(prev => [...prev, p.id]);
+                            } else {
+                              setSelectedPatientIds(prev => prev.filter(id => id !== p.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
+                        />
+                      </td>
+                    )}
+                    <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-950">
                         <User className="w-5 h-5" />
@@ -402,7 +497,7 @@ export default function PatientList({ currentUser }: PatientListProps) {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
           
@@ -495,6 +590,47 @@ export default function PatientList({ currentUser }: PatientListProps) {
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : <Check className="w-4 h-4" />}
                   {confirmModal.type === 'delete' ? 'Yes, Delete' : 'Yes, Move'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-red-50 text-red-600">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              
+              <h3 className="text-xl font-bold text-slate-900">
+                Permanently Delete {selectedPatientIds.length} Patients?
+              </h3>
+              
+              <p className="text-slate-500 text-sm mt-2 leading-relaxed">
+                Are you sure you want to permanently delete these {selectedPatientIds.length} patients? All selected directory profiles will be deleted, and this action cannot be undone.
+              </p>
+
+              <div className="flex gap-3 mt-8">
+                <button 
+                  onClick={() => setBulkDeleteModalOpen(false)}
+                  disabled={isBulkDeleting}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={executeBulkDelete}
+                  disabled={isBulkDeleting}
+                  className="flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 bg-red-600 hover:bg-red-700 shadow-red-100"
+                >
+                  {isBulkDeleting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : <Check className="w-4 h-4" />}
+                  Yes, Delete All
                 </button>
               </div>
             </div>
