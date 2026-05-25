@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, ClipboardList, Settings, LogOut, User as UserIcon, MessageSquare, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Settings, LogOut, User as UserIcon, MessageSquare, Calendar, FileSpreadsheet } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { UserProfile, UserPermission } from '../types';
 
@@ -16,6 +16,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
     { id: 'calendar', label: 'Calendar', icon: Calendar, permission: 'view_history' as UserPermission, tooltip: "View upcoming appointments and reminders" },
     { id: 'cases', label: 'Follow-up Cases', icon: ClipboardList, permission: 'view_history' as UserPermission, tooltip: "Cases that have already been followed up" },
     { id: 'todo', label: 'To Do List', icon: ClipboardList, permission: 'view_history' as UserPermission, tooltip: "Reminders and Doctor's requests" },
+    { id: 'peka_b40', label: 'PeKa B40', icon: FileSpreadsheet, permission: 'view_history' as UserPermission, tooltip: "Manage PeKa B40 patients" },
     { id: 'patients', label: 'Patients', icon: Users, permission: 'view_history' as UserPermission, tooltip: "List of patients who need follow-up but have not yet been contacted" },
     { id: 'users', label: 'Users', icon: UserIcon, permission: 'manage_users' as UserPermission, tooltip: "Manage staff accounts and permissions" },
   ];
