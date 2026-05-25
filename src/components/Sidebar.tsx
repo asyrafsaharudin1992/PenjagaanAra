@@ -32,7 +32,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout }: Sid
         </div>
 
         <nav className="space-y-1">
-          {menuItems.filter(item => user.role !== 'Staff' || item.id === 'peka_b40').map((item) => (
+          {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
