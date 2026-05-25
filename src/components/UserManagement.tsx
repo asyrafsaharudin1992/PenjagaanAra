@@ -421,6 +421,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                     <option value="Doctor">Doctor</option>
                     <option value="Admin">Admin</option>
                     <option value="Superadmin">Superadmin</option>
+                    <option value="Staff">Staff</option>
                   </select>
                 </div>
 
@@ -562,6 +563,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                     <option value="Doctor">Doctor</option>
                     <option value="Admin">Admin</option>
                     <option value="Superadmin">Superadmin</option>
+                    <option value="Staff">Staff</option>
                   </select>
                 </div>
 
