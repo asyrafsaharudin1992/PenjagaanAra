@@ -62,6 +62,7 @@ export interface FollowUpCase {
   createdByEmail?: string;
   createdByUid?: string;
   registryData?: string;
+  status?: string[];
 }
 
 export interface DashboardStats {
