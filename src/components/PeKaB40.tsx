@@ -906,39 +906,44 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   ).sort();
 
   const nearestAppointments = useMemo(() => {
-    const todayStr = "2026-05-25";
+    // 1. Dapatkan tarikh hari ini (set jam ke 00:00:00 untuk perbandingan adil)
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     
+    // Fungsi bantuan untuk tukar teks "DD-MM-YYYY" menjadi angka Timestamp waktu (ms)
+    const parseDDMMYYYY = (dateStr) => {
+      if (!dateStr || typeof dateStr !== 'string') return 0;
+      const parts = dateStr.trim().split('-');
+      if (parts.length !== 3) return 0;
+      
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1; // Bulan dalam JS bermula dari 0
+      const y = parseInt(parts[2], 10);
+      
+      return new Date(y, m, d).getTime();
+    };
+
     return patients
       .filter(p => {
         const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
         const matchesPostcode = postcodeFilter === 'All' || String(p.postalCode || '').trim() === postcodeFilter;
-        return matchesBranch && matchesPostcode && p.appointmentDate && p.appointmentDate.trim() !== '';
+        
+        // Status exclusion
+        const isExcludedStatus = p.remarks === 'done pekab40' || p.remarks === 'refuse';
+        
+        // Tukar tarikh pesakit (DD-MM-YYYY) kepada timestamp untuk dibandingkan dengan hari ini
+        const apptTimestamp = parseDDMMYYYY(p.appointmentDate);
+        const isFutureOrToday = apptTimestamp >= todayStart;
+        
+        return matchesBranch && matchesPostcode && !isExcludedStatus && isFutureOrToday;
       })
       .map(p => {
-        const parts = p.appointmentDate.split('-');
-        let timeVal = 0;
-        if (parts.length === 3) {
-          const y = parseInt(parts[0], 10);
-          const m = parseInt(parts[1], 10) - 1;
-          const d = parseInt(parts[2], 10);
-          timeVal = new Date(y, m, d).getTime();
-        } else {
-          timeVal = new Date(p.appointmentDate || '').getTime() || 0;
-        }
-        return { ...p, timeVal };
+        // Masukkan nilai timestamp ke dalam objek untuk memudahkan susunan (sorting)
+        return { ...p, apptTimestamp: parseDDMMYYYY(p.appointmentDate) };
       })
       .sort((a, b) => {
-        const aIsUpcoming = a.appointmentDate >= todayStr;
-        const bIsUpcoming = b.appointmentDate >= todayStr;
-        
-        if (aIsUpcoming && !bIsUpcoming) return -1;
-        if (!aIsUpcoming && bIsUpcoming) return 1;
-        
-        if (aIsUpcoming && bIsUpcoming) {
-          return a.timeVal - b.timeVal;
-        } else {
-          return b.timeVal - a.timeVal;
-        }
+        // Susun secara kronologi menaik (tarikh paling dekat di depan)
+        return a.apptTimestamp - b.apptTimestamp;
       })
       .slice(0, 4);
   }, [patients, branchFilter, postcodeFilter]);
