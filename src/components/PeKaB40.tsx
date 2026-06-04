@@ -906,18 +906,20 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   ).sort();
 
   const nearestAppointments = useMemo(() => {
-    // 1. Dapatkan tarikh hari ini (set jam ke 00:00:00 untuk perbandingan adil)
+    // 1. Dapatkan tarikh hari ini (00:00:00)
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     
-    // Fungsi bantuan untuk tukar teks "DD-MM-YYYY" menjadi angka Timestamp waktu (ms)
+    // Fungsi bantuan yang boleh membaca "DD-MM-YYYY" ATAU "DD/MM/YYYY"
     const parseDDMMYYYY = (dateStr) => {
       if (!dateStr || typeof dateStr !== 'string') return 0;
-      const parts = dateStr.trim().split('-');
+      
+      // Menggunakan regex untuk pecahkan sama ada jumpa '-' atau '/'
+      const parts = dateStr.trim().split(/[-/]/);
       if (parts.length !== 3) return 0;
       
       const d = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1; // Bulan dalam JS bermula dari 0
+      const m = parseInt(parts[1], 10) - 1; // Bulan JS bermula dari 0
       const y = parseInt(parts[2], 10);
       
       return new Date(y, m, d).getTime();
@@ -931,18 +933,17 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         // Status exclusion
         const isExcludedStatus = p.remarks === 'done pekab40' || p.remarks === 'refuse';
         
-        // Tukar tarikh pesakit (DD-MM-YYYY) kepada timestamp untuk dibandingkan dengan hari ini
+        // Tukar tarikh pesakit kepada timestamp
         const apptTimestamp = parseDDMMYYYY(p.appointmentDate);
         const isFutureOrToday = apptTimestamp >= todayStart;
         
         return matchesBranch && matchesPostcode && !isExcludedStatus && isFutureOrToday;
       })
       .map(p => {
-        // Masukkan nilai timestamp ke dalam objek untuk memudahkan susunan (sorting)
         return { ...p, apptTimestamp: parseDDMMYYYY(p.appointmentDate) };
       })
       .sort((a, b) => {
-        // Susun secara kronologi menaik (tarikh paling dekat di depan)
+        // Susun secara kronologi menaik (paling dekat di depan)
         return a.apptTimestamp - b.apptTimestamp;
       })
       .slice(0, 4);
