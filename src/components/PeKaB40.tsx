@@ -906,47 +906,61 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   ).sort();
 
   const nearestAppointments = useMemo(() => {
-    // 1. Dapatkan tarikh hari ini (00:00:00)
+    // 1. Dapatkan tanda masa awal hari ini (00:00:00) untuk perbandingan yang tepat
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     
-    // Fungsi bantuan yang boleh membaca "DD-MM-YYYY" ATAU "DD/MM/YYYY"
-    const parseDDMMYYYY = (dateStr) => {
+    // Fungsi pintar: Boleh baca format input kalendar (YYYY-MM-DD) DAN format tulisan CSV (DD/MM/YYYY atau DD-MM-YYYY)
+    const parseFlexibleDate = (dateStr) => {
       if (!dateStr || typeof dateStr !== 'string') return 0;
       
-      // Menggunakan regex untuk pecahkan sama ada jumpa '-' atau '/'
       const parts = dateStr.trim().split(/[-/]/);
       if (parts.length !== 3) return 0;
       
-      const d = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1; // Bulan JS bermula dari 0
-      const y = parseInt(parts[2], 10);
+      let d, m, y;
+      
+      // Jika bahagian pertama ialah 4 digit (Format: YYYY-MM-DD dari HTML5 date picker)
+      if (parts[0].length === 4) {
+        y = parseInt(parts[0], 10);
+        m = parseInt(parts[1], 10) - 1;
+        d = parseInt(parts[2], 10);
+      } else {
+        // Jika bahagian terakhir ialah 4 digit (Format: DD-MM-YYYY atau DD/MM/YYYY dari CSV)
+        d = parseInt(parts[0], 10);
+        m = parseInt(parts[1], 10) - 1;
+        y = parseInt(parts[2], 10);
+      }
       
       return new Date(y, m, d).getTime();
     };
 
     return patients
       .filter(p => {
+        // 2. Tapis mengikut tetapan cawangan dan poskod semasa di dashboard
         const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
         const matchesPostcode = postcodeFilter === 'All' || String(p.postalCode || '').trim() === postcodeFilter;
         
-        // Status exclusion
-        const isExcludedStatus = p.remarks === 'done pekab40' || p.remarks === 'refuse';
+        // 3. Tapis status (Sembunyikan kes yang sudah selesai 'done pekab40' atau ditolak 'refuse')
+        const currentRemarks = String(p.remarks || '').toLowerCase().trim();
+        const isExcludedStatus = currentRemarks === 'done pekab40' || currentRemarks === 'refuse';
         
-        // Tukar tarikh pesakit kepada timestamp
-        const apptTimestamp = parseDDMMYYYY(p.appointmentDate);
+        // 4. Tukar tarikh pesakit kepada timestamp angka untuk dibandingkan dengan hari ini
+        const apptTimestamp = parseFlexibleDate(p.appointmentDate);
+        
+        // Kriteria kelulusan: Mesti ada tarikh sah, sepadan cawangan/poskod, belum selesai, dan tarikhnya >= HARI INI
         const isFutureOrToday = apptTimestamp >= todayStart;
         
         return matchesBranch && matchesPostcode && !isExcludedStatus && isFutureOrToday;
       })
       .map(p => {
-        return { ...p, apptTimestamp: parseDDMMYYYY(p.appointmentDate) };
+        // Masukkan nilai timestamp ke dalam objek untuk memudahkan proses susunan (sorting)
+        return { ...p, apptTimestamp: parseFlexibleDate(p.appointmentDate) };
       })
       .sort((a, b) => {
-        // Susun secara kronologi menaik (paling dekat di depan)
+        // 5. Susun secara kronologi menaik (tarikh paling hampir dengan hari ini akan duduk di sebelah kiri sekali)
         return a.apptTimestamp - b.apptTimestamp;
       })
-      .slice(0, 4);
+      .slice(0, 4); // Hadkan paparan kepada 4 kad teratas sahaja
   }, [patients, branchFilter, postcodeFilter]);
 
   const getStatusBadgeClass = (status: string) => {
