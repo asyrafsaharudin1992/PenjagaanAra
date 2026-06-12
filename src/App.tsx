@@ -606,8 +606,8 @@ export default function App() {
       <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
         <Sidebar activeTab={activeTab} setActiveTab={handleSetActiveTab} user={user} onLogout={handleLogout} />
         
-        <main className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-6xl mx-auto">
+        <main className="flex-1 p-4 lg:p-8 overflow-y-auto min-w-0">
+          <div className="w-full flex-1 px-0 sm:px-2 lg:px-4">
             <div className="flex justify-end mb-6">
               {activeTab === 'cases' && user.permissions?.includes('create_case') && (
                 <button 
