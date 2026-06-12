@@ -252,33 +252,63 @@ const getWhatsAppLink = (phone: string, msg: string) => {
   return `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`;
 };
 
-const getWhatsAppMessage = (p: PeKaPatient) => {
-  const statusVal = String(p.remarks || '').trim().toLowerCase();
-  const nama_pesakit = p.name || 'Tuan/Puan';
-  const appt_date = p.appointmentDate || '-';
-  const appt_time = p.time || '-';
-  const lokasi_klinik = p.branch ? `Klinik ARA 24 Jam (${p.branch})` : 'Klinik ARA 24 Jam';
 
-  if (statusVal === 'appt given') {
-    return `Salam Tuan/Puan ${nama_pesakit},\n` +
-           `Saya dari Klinik ARA 24 Jam ingin memaklumkan bahawa tarikh temu janji saringan kesihatan percuma PeKa B40 Tuan/Puan adalah seperti berikut:\n\n` +
-           `📅 Tarikh: ${appt_date}\n` +
-           `⏰ Masa: ${appt_time}\n` +
-           `🏥 Lokasi: ${lokasi_klinik}\n\n` +
-           `Boleh hadir tepat pada masa yang ditetapkan dan bawa bersama dokumen pengenalan diri untuk tujuan pengesahan.\n` +
-           `Sekiranya ada sebarang pertanyaan atau keperluan untuk menukar tarikh, boleh maklumkan kepada pihak klinik.\n\n` +
-           `Terima kasih,\nKlinik ARA 24 Jam`;
-  } else {
-    return `Salam Tuan/Puan ${nama_pesakit},\n\n` +
-           `Tuan/Puan layak untuk menjalani saringan kesihatan percuma di bawah program PeKa B40 di Klinik ARA 24 Jam. ` +
-           `Antara ujian yang akan dijalankan termasuklah ujian sel darah, ujian kawalan gula darah, ujian paras kolesterol, ` +
-           `ujian fungsi buah pinggang dan ujian air kencing.\n\n` +
-           `Sekiranya berminat untuk membuat temu janji, boleh hubungi kami semula.\n\n` +
-           `Terima kasih,\nKlinik ARA 24 Jam`;
-  }
+interface WhatsAppTemplates {
+  appt_given: string;
+  not_contacted: string;
+  follow_up: string;
+}
+
+const defaultTemplates: WhatsAppTemplates = {
+  appt_given: `Salam Tuan/Puan {{nama}},\nSaya dari Klinik ARA 24 Jam ingin memaklumkan bahawa tarikh temu janji saringan kesihatan percuma PeKa B40 Tuan/Puan adalah seperti berikut:\n\n📅 Tarikh: {{tarikh}}\n⏰ Masa: {{masa}}\n🏥 Lokasi: {{lokasi}}\n\nBoleh hadir tepat pada masa yang ditetapkan dan bawa bersama dokumen pengenalan diri untuk tujuan pengesahan.\nSekiranya ada sebarang pertanyaan atau keperluan untuk menukar tarikh, boleh maklumkan kepada pihak klinik.\n\nTerima kasih,\nKlinik ARA 24 Jam`,
+  not_contacted: `Salam Tuan/Puan {{nama}},\n\nTuan/Puan layak untuk menjalani saringan kesihatan percuma di bawah program PeKa B40 di Klinik ARA 24 Jam. Antara ujian yang akan dijalankan termasuklah ujian sel darah, ujian kawalan gula darah, ujian paras kolesterol, ujian fungsi buah pinggang dan ujian air kencing.\n\nSekiranya berminat untuk membuat temu janji, boleh hubungi kami semula.\n\nTerima kasih,\nKlinik ARA 24 Jam`,
+  follow_up: `Salam Tuan/Puan {{nama}},\n\nIni adalah peringatan mesra dari Klinik ARA 24 Jam. Kami masih menunggu maklum balas dari pihak Tuan/Puan berkenaan saringan kesihatan PeKa B40 secara percuma.\n\nSila hubungi kami jika berminat.`
 };
 
 export default function PeKaB40({ currentUser }: PeKaB40Props) {
+  // WhatsApp Templates & Modal States
+  const [customTemplates, setCustomTemplates] = useState<WhatsAppTemplates>(defaultTemplates);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  
+  const [whatsappModalObj, setWhatsappModalObj] = useState<PeKaPatient | null>(null);
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [whatsappSelectedTemplate, setWhatsappSelectedTemplate] = useState<keyof WhatsAppTemplates>('not_contacted');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('peka_whatsapp_templates');
+    if (saved) {
+      try {
+        setCustomTemplates({ ...defaultTemplates, ...JSON.parse(saved) });
+      } catch(e) {}
+    }
+  }, []);
+
+  const saveTemplates = (newTemplates: WhatsAppTemplates) => {
+    setCustomTemplates(newTemplates);
+    localStorage.setItem('peka_whatsapp_templates', JSON.stringify(newTemplates));
+    toast.success('WhatsApp templates updated successfully');
+  };
+
+  const compileMessage = (template: string, p: PeKaPatient) => {
+    return template
+      .replace(/\{\{nama\}\}/g, p.name || 'Tuan/Puan')
+      .replace(/\{\{tarikh\}\}/g, p.appointmentDate || '-')
+      .replace(/\{\{masa\}\}/g, p.time || '-')
+      .replace(/\{\{lokasi\}\}/g, p.branch ? `Klinik ARA 24 Jam (${p.branch})` : 'Klinik ARA 24 Jam');
+  };
+
+  const handleOpenWhatsApp = (p: PeKaPatient) => {
+    const statusVal = String(p.remarks || '').trim().toLowerCase();
+    let defaultTmpl: keyof WhatsAppTemplates = 'not_contacted';
+    
+    if (statusVal === 'appt given') defaultTmpl = 'appt_given';
+    else if (statusVal === 'to call again') defaultTmpl = 'follow_up';
+    
+    setWhatsappSelectedTemplate(defaultTmpl);
+    setWhatsappMessage(compileMessage(customTemplates[defaultTmpl], p));
+    setWhatsappModalObj(p);
+  };
+
   // Local Database patients loaded from Firestore
   const [patients, setPatients] = useState<PeKaPatient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -906,61 +936,46 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   ).sort();
 
   const nearestAppointments = useMemo(() => {
-    // 1. Dapatkan tanda masa awal hari ini (00:00:00) untuk perbandingan yang tepat
+    // 1. Dapatkan tarikh hari ini (set jam ke 00:00:00 untuk perbandingan adil)
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     
-    // Fungsi pintar: Boleh baca format input kalendar (YYYY-MM-DD) DAN format tulisan CSV (DD/MM/YYYY atau DD-MM-YYYY)
-    const parseFlexibleDate = (dateStr) => {
+    // Fungsi bantuan untuk tukar teks "DD-MM-YYYY" menjadi angka Timestamp waktu (ms)
+    const parseDDMMYYYY = (dateStr) => {
       if (!dateStr || typeof dateStr !== 'string') return 0;
-      
-      const parts = dateStr.trim().split(/[-/]/);
+      const parts = dateStr.trim().split('-');
       if (parts.length !== 3) return 0;
       
-      let d, m, y;
-      
-      // Jika bahagian pertama ialah 4 digit (Format: YYYY-MM-DD dari HTML5 date picker)
-      if (parts[0].length === 4) {
-        y = parseInt(parts[0], 10);
-        m = parseInt(parts[1], 10) - 1;
-        d = parseInt(parts[2], 10);
-      } else {
-        // Jika bahagian terakhir ialah 4 digit (Format: DD-MM-YYYY atau DD/MM/YYYY dari CSV)
-        d = parseInt(parts[0], 10);
-        m = parseInt(parts[1], 10) - 1;
-        y = parseInt(parts[2], 10);
-      }
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1; // Bulan dalam JS bermula dari 0
+      const y = parseInt(parts[2], 10);
       
       return new Date(y, m, d).getTime();
     };
 
     return patients
       .filter(p => {
-        // 2. Tapis mengikut tetapan cawangan dan poskod semasa di dashboard
         const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
         const matchesPostcode = postcodeFilter === 'All' || String(p.postalCode || '').trim() === postcodeFilter;
         
-        // 3. Tapis status (Sembunyikan kes yang sudah selesai 'done pekab40' atau ditolak 'refuse')
-        const currentRemarks = String(p.remarks || '').toLowerCase().trim();
-        const isExcludedStatus = currentRemarks === 'done pekab40' || currentRemarks === 'refuse';
+        // Status exclusion
+        const isExcludedStatus = p.remarks === 'done pekab40' || p.remarks === 'refuse';
         
-        // 4. Tukar tarikh pesakit kepada timestamp angka untuk dibandingkan dengan hari ini
-        const apptTimestamp = parseFlexibleDate(p.appointmentDate);
-        
-        // Kriteria kelulusan: Mesti ada tarikh sah, sepadan cawangan/poskod, belum selesai, dan tarikhnya >= HARI INI
+        // Tukar tarikh pesakit (DD-MM-YYYY) kepada timestamp untuk dibandingkan dengan hari ini
+        const apptTimestamp = parseDDMMYYYY(p.appointmentDate);
         const isFutureOrToday = apptTimestamp >= todayStart;
         
         return matchesBranch && matchesPostcode && !isExcludedStatus && isFutureOrToday;
       })
       .map(p => {
-        // Masukkan nilai timestamp ke dalam objek untuk memudahkan proses susunan (sorting)
-        return { ...p, apptTimestamp: parseFlexibleDate(p.appointmentDate) };
+        // Masukkan nilai timestamp ke dalam objek untuk memudahkan susunan (sorting)
+        return { ...p, apptTimestamp: parseDDMMYYYY(p.appointmentDate) };
       })
       .sort((a, b) => {
-        // 5. Susun secara kronologi menaik (tarikh paling hampir dengan hari ini akan duduk di sebelah kiri sekali)
+        // Susun secara kronologi menaik (tarikh paling dekat di depan)
         return a.apptTimestamp - b.apptTimestamp;
       })
-      .slice(0, 4); // Hadkan paparan kepada 4 kad teratas sahaja
+      .slice(0, 4);
   }, [patients, branchFilter, postcodeFilter]);
 
   const getStatusBadgeClass = (status: string) => {
@@ -1020,6 +1035,14 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           >
             <Upload className="w-3.5 h-3.5" />
             IMPORT CSV
+          </button>
+
+          <button
+            onClick={() => setIsTemplateModalOpen(true)}
+            className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl bg-white hover:bg-slate-50 text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5 fill-current shrink-0 text-emerald-600" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            TEMPLATES
           </button>
 
           <button
@@ -1236,10 +1259,8 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
 
                   <div className="mt-4 flex items-center gap-2 pt-2 border-t border-slate-200/60">
                     {p.phone ? (
-                      <a
-                        href={getWhatsAppLink(p.phone, getWhatsAppMessage(p))}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={() => handleOpenWhatsApp(p)}
                         className="flex-1 p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center justify-center gap-1 text-[10px] font-extrabold cursor-pointer font-sans"
                         title="Send WhatsApp Message"
                       >
@@ -1247,7 +1268,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                         </svg>
                         WhatsApp
-                      </a>
+                      </button>
                     ) : (
                       <span className="flex-1 p-1.5 bg-slate-100 text-slate-400 rounded-lg flex items-center justify-center text-[10px] font-extrabold font-sans">
                         No Phone
@@ -1285,24 +1306,24 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[1000px] border-collapse text-sm">
+            <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200">
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name & IC</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">PostalCode</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-40">Next Appointment Date</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-32">Remarks</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">Time</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Additional Notes</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-28">Cawangan</th>
-                  <th className="px-5 py-4 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24 text-right">Actions</th>
+                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name & IC</th>
+                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">PostalCode</th>
+                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-36">Next Appointment Date</th>
+                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-[140px]">Remarks</th>
+                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">Time</th>
+                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Additional Notes</th>
+                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">Cawangan</th>
+                  <th className="px-2 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedPatients.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-bold text-slate-900 uppercase break-words min-w-[200px]" title={p.name}>
+                    <td className="px-3 py-3">
+                      <p className="text-sm font-bold text-slate-900 uppercase break-words leading-tight" title={p.name}>
                         {p.name}
                       </p>
                       {p.ic && (
@@ -1311,23 +1332,23 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                         </p>
                       )}
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs text-slate-500 font-mono">
+                    <td className="px-3 py-3 text-xs text-slate-500 font-mono break-all">
                       {p.postalCode || '-'}
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <InlineDateCell
                         patientId={p.id}
                         initialValue={p.appointmentDate}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap max-w-[140px]">
                       <select
                         value={String(p.remarks || 'not contacted yet').trim().toLowerCase()}
                         onChange={(e) => handleUpdateRemarks(p.id, e.target.value)}
                         className={cn(
                           getStatusBadgeClass(p.remarks || 'not contacted yet'),
-                          "cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-wide"
+                          "w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_6px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px]"
                         )}
                       >
                         {remarksOptions.map(option => (
@@ -1342,34 +1363,32 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                         )}
                       </select>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap min-w-[90px]">
                       <InlineTimeCell
                         patientId={p.id}
                         initialValue={p.time}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-3 min-w-[150px]">
                       <InlineNotesCell
                         patientId={p.id}
                         initialValue={p.additionalNotes}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3">
                       <InlineBranchCell
                         patientId={p.id}
                         initialValue={p.branch}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                    <td className="px-2 py-3 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1">
                         {p.phone && (
-                          <a
-                            href={getWhatsAppLink(p.phone, getWhatsAppMessage(p))}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={() => handleOpenWhatsApp(p)}
                             className="p-1 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
                             title="Send WhatsApp Message"
                           >
@@ -1377,7 +1396,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                             </svg>
                             WhatsApp
-                          </a>
+                          </button>
                         )}
                         <button
                           onClick={() => handleOpenEdit(p)}
@@ -2090,6 +2109,165 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                 </div>
               )}
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WHATSAPP DYNAMIC MESSAGE SEND MODAL */}
+      {whatsappModalObj && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50/50">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <svg className="w-5 h-5 fill-current shrink-0 text-emerald-600" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                Send WhatsApp Message
+              </h3>
+              <button 
+                onClick={() => setWhatsappModalObj(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Recipient Patient</span>
+                <p className="text-sm font-black text-slate-800 uppercase">{whatsappModalObj.name}</p>
+                <p className="text-[11px] text-slate-500 font-bold font-mono">Handphone: {whatsappModalObj.phone}</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Template</label>
+                <select
+                  value={whatsappSelectedTemplate}
+                  onChange={(e) => {
+                    const key = e.target.value as keyof WhatsAppTemplates;
+                    setWhatsappSelectedTemplate(key);
+                    setWhatsappMessage(compileMessage(customTemplates[key], whatsappModalObj));
+                  }}
+                  className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-emerald-600 outline-none"
+                >
+                  <option value="not_contacted">General Invitiation (Belum dihubungi)</option>
+                  <option value="appt_given">Appointment Confirmation (Appt Given)</option>
+                  <option value="follow_up">Follow up (Call Again / Not Answered)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Message Content</label>
+                <textarea
+                  rows={8}
+                  value={whatsappMessage}
+                  onChange={(e) => setWhatsappMessage(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-55/60 border border-slate-200 text-xs font-medium rounded-xl focus:bg-white focus:border-emerald-600 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setWhatsappModalObj(null)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <a
+                  href={getWhatsAppLink(whatsappModalObj.phone, whatsappMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setWhatsappModalObj(null)}
+                  className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                >
+                  Open in WhatsApp
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WHATSAPP MANAGE TEMPLATES MODAL */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-[110] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <svg className="w-5 h-5 fill-current shrink-0 text-emerald-600" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  Manage WhatsApp Templates
+                </h3>
+                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Editing these templates will change the default message prefilled for all future patients you contact from this browser.</p>
+              </div>
+              <button 
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex flex-col gap-1.5">
+                <span className="text-[10px] font-extrabold text-indigo-950 uppercase tracking-wider">Available Variables You Can Use:</span>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-[10px] font-mono text-indigo-800 bg-white border border-indigo-200 px-1.5 py-0.5 rounded">{`{{nama}}`}</span>
+                  <span className="text-[10px] font-mono text-indigo-800 bg-white border border-indigo-200 px-1.5 py-0.5 rounded">{`{{tarikh}}`}</span>
+                  <span className="text-[10px] font-mono text-indigo-800 bg-white border border-indigo-200 px-1.5 py-0.5 rounded">{`{{masa}}`}</span>
+                  <span className="text-[10px] font-mono text-indigo-800 bg-white border border-indigo-200 px-1.5 py-0.5 rounded">{`{{lokasi}}`}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">General Invitation (Belum Dihubungi)</label>
+                <textarea
+                  rows={6}
+                  value={customTemplates.not_contacted}
+                  onChange={(e) => setCustomTemplates({...customTemplates, not_contacted: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50/50 hover:bg-slate-50 border border-slate-200 text-xs font-medium rounded-xl focus:bg-white focus:border-emerald-600 outline-none resize-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">Appointment Confirmation (Appt Given)</label>
+                <textarea
+                  rows={8}
+                  value={customTemplates.appt_given}
+                  onChange={(e) => setCustomTemplates({...customTemplates, appt_given: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50/50 hover:bg-slate-50 border border-slate-200 text-xs font-medium rounded-xl focus:bg-white focus:border-emerald-600 outline-none resize-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">Follow up / To Call Again</label>
+                <textarea
+                  rows={5}
+                  value={customTemplates.follow_up}
+                  onChange={(e) => setCustomTemplates({...customTemplates, follow_up: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50/50 hover:bg-slate-50 border border-slate-200 text-xs font-medium rounded-xl focus:bg-white focus:border-emerald-600 outline-none resize-none transition-all"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsTemplateModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                     saveTemplates(customTemplates);
+                     setIsTemplateModalOpen(false);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  Save as My Defaults
+                </button>
+              </div>
             </div>
           </div>
         </div>
