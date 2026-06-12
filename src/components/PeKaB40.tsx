@@ -290,9 +290,25 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   };
 
   const compileMessage = (template: string, p: PeKaPatient) => {
+    let formattedDate = p.appointmentDate || '-';
+    if (formattedDate && formattedDate !== '-') {
+      if (formattedDate.includes('-')) {
+        const parts = formattedDate.split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+          // If YYYY-MM-DD, convert to DD-MM-YYYY
+          formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      } else if (formattedDate.includes('/')) {
+        const parts = formattedDate.split('/');
+        if (parts.length === 3 && parts[2].length === 4) {
+          // If DD/MM/YYYY, convert to DD-MM-YYYY
+          formattedDate = `${parts[0]}-${parts[1]}-${parts[2]}`;
+        }
+      }
+    }
     return template
       .replace(/\{\{nama\}\}/g, p.name || 'Tuan/Puan')
-      .replace(/\{\{tarikh\}\}/g, p.appointmentDate || '-')
+      .replace(/\{\{tarikh\}\}/g, formattedDate)
       .replace(/\{\{masa\}\}/g, p.time || '-')
       .replace(/\{\{lokasi\}\}/g, p.branch ? `Klinik ARA 24 Jam (${p.branch})` : 'Klinik ARA 24 Jam');
   };
@@ -940,15 +956,26 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     
-    // Fungsi bantuan untuk tukar teks "DD-MM-YYYY" menjadi angka Timestamp waktu (ms)
-    const parseDDMMYYYY = (dateStr) => {
+    // Fungsi bantuan untuk tukar teks tarikh menjadi angka Timestamp waktu (ms)
+    const parseDDMMYYYY = (dateStr: string | null | undefined) => {
       if (!dateStr || typeof dateStr !== 'string') return 0;
-      const parts = dateStr.trim().split('-');
+      const clean = dateStr.trim();
+      const separator = clean.includes('/') ? '/' : '-';
+      const parts = clean.split(separator);
       if (parts.length !== 3) return 0;
       
-      const d = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1; // Bulan dalam JS bermula dari 0
-      const y = parseInt(parts[2], 10);
+      let d = 0, m = 0, y = 0;
+      if (parts[0].length === 4) {
+        // Format YYYY-MM-DD atau YYYY/MM/DD
+        y = parseInt(parts[0], 10);
+        m = parseInt(parts[1], 10) - 1;
+        d = parseInt(parts[2], 10);
+      } else {
+        // Format DD-MM-YYYY atau DD/MM/YYYY
+        d = parseInt(parts[0], 10);
+        m = parseInt(parts[1], 10) - 1;
+        y = parseInt(parts[2], 10);
+      }
       
       return new Date(y, m, d).getTime();
     };
