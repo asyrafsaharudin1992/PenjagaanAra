@@ -16,7 +16,8 @@ import {
   Copy,
   Undo2,
   Check,
-  Loader2
+  Loader2,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FollowUpCase, FollowUpTag, UserPermission, UserProfile, Patient } from '../types';
@@ -38,6 +39,14 @@ const STATUS_COLORS: Record<string, string> = {
   'Responded': 'bg-[#E8F0FE] text-[#1A73E8]',
   'No Response': 'bg-[#FEF7E0] text-[#B06000]',
   'Defaulter': 'bg-[#FCE8E6] text-[#C5221F]',
+};
+
+const defaultTemplates: Record<string, string> = {
+  'All Branches|arawellness': `Salam sejahtera {{nama}},\n\nSaya dari Klinik ARA 24 Jam. Terima kasih atas kepercayaan tuan/puan memilih kami untuk rawatan suntikan Mounjaro.\n\nBoleh tuan/puan isikan maklumat berat badan terkini dan kesan sampingan ubat (jika ada) melalui pautan rasmi berikut untuk semakan pihak doktor\n{{url}}\n\nTerima kasih 😊`,
+  'All Branches|referral': `Salam tuan/puan, saya daripada Klinik ARA 24 Jam, terima kasih kerana mendapatkan perkhidmatan di klinik kami.\n\nBoleh saya tahu keadaan {{nama}} setelah dirujuk ke hospital tempoh hari?`,
+  'All Branches|aramommy': `Salam puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam berkenaan temu janji ARAMOMMY.`,
+  'All Branches|arachronic': `Salam tuan/puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam untuk pemeriksaan penyakit kronik.`,
+  'All Branches|others': `Salam tuan/puan {{nama}},\n\nIni adalah mesej susulan dari Klinik ARA 24 Jam.`,
 };
 
 export default function CaseList({ cases, onViewCase, currentUser, tagFilter, setTagFilter }: CaseListProps) {
@@ -106,6 +115,44 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
   const canExportCSV = userPermissions.includes('export_csv');
 
   const [exportModal, setExportModal] = useState({ isOpen: false, startPage: 1, endPage: 1, isExporting: false });
+
+  const [customTemplates, setCustomTemplates] = useState<Record<string, string>>(defaultTemplates);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [selectedTemplateBranch, setSelectedTemplateBranch] = useState<string>('All Branches');
+  const [selectedTemplateTag, setSelectedTemplateTag] = useState<string>('arawellness');
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('followup_whatsapp_templates');
+    if (saved) {
+      try {
+        setCustomTemplates(prev => ({ ...prev, ...JSON.parse(saved) }));
+      } catch(e) {}
+    }
+  }, []);
+
+  const saveTemplates = (newTemplates: Record<string, string>) => {
+    setCustomTemplates(newTemplates);
+    localStorage.setItem('followup_whatsapp_templates', JSON.stringify(newTemplates));
+    if (typeof toast !== 'undefined' && toast.success) {
+      toast.success('WhatsApp templates updated successfully');
+    }
+  };
+
+  const getTemplateMessage = (branch: string, tag: string, p: FollowUpCase, finalUrl?: string) => {
+    const t = (tag || 'others').toLowerCase().trim();
+    // try exact match first
+    let tmpl = customTemplates[`${branch}|${t}`];
+    if (!tmpl) {
+      tmpl = customTemplates[`All Branches|${t}`];
+    }
+    if (!tmpl) {
+      tmpl = customTemplates[`All Branches|others`];
+    }
+
+    return (tmpl || '')
+      .replace(/\{\{nama\}\}/g, p.patientName || 'Tuan/Puan')
+      .replace(/\{\{url\}\}/g, finalUrl || '-');
+  };
 
   const handleExportCSV = () => {
     setExportModal({
@@ -323,13 +370,18 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
 
   const historyPatientName = patientHistory[0]?.patientName || '';
 
-  const formatWhatsAppLink = (phone?: string) => {
+  const formatWhatsAppLink = (phone?: string, message?: string) => {
     if (!phone) return null;
     // Remove non-digit characters
     const cleaned = phone.replace(/\D/g, '');
     // If it starts with '0', replace with '60' (Malaysia)
     const formatted = cleaned.startsWith('0') ? '60' + cleaned.substring(1) : cleaned;
-    return `https://wa.me/${formatted}`;
+    
+    let url = `https://wa.me/${formatted}`;
+    if (message) {
+      url += `?text=${encodeURIComponent(message)}`;
+    }
+    return url;
   };
 
   return (
@@ -406,22 +458,40 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
               EXPORT CSV
             </button>
           )}
+          
+          <button 
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-colors"
+            onClick={() => setIsTemplateModalOpen(true)}
+          >
+            <MessageCircle className="w-4 h-4" />
+            TEMPLATES
+          </button>
         </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+        <div className="w-full">
+          <table className="w-full text-left border-collapse table-fixed">
+            <colgroup>
+              <col className="w-[24%]" />
+              <col className="w-[8%]" />
+              <col className="w-[14%]" />
+              <col className="w-[9%]" />
+              <col className="w-[9%]" />
+              <col className="w-[11%]" />
+              <col className="w-[15%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Patient</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Diagnosis</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Visit Date</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Appt Date</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Doctor</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tag</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Patient</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Branch</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Diagnosis</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Visit Date</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Appt Date</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Doctor</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Tag</th>
+                <th className="px-2 xl:px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right truncate">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -431,25 +501,25 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                   className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
                   onClick={() => onViewCase(c.id)}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-2 xl:px-4 py-3 align-top min-w-0">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-start gap-1.5 h-full">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             setHistoryPatientId(c.patientId);
                           }}
-                          className="text-xs font-semibold text-slate-900 hover:text-indigo-600 hover:underline text-left whitespace-normal break-words"
+                          className="font-semibold text-slate-800 whitespace-normal break-words leading-snug hover:text-indigo-600 hover:underline text-left text-xs xl:text-sm"
                         >
                           {c.patientName}
                         </button>
                         {(c.followUpTag || '').toLowerCase().includes('referral') && c.remarks && c.remarks.trim() !== '' && !c.isNotesCopied && (
-                          <span title="Remarks added. Please copy notes to clinic system." className="flex-shrink-0">
+                          <span title="Remarks added. Please copy notes to clinic system." className="flex-shrink-0 mt-0.5">
                             <AlertCircle className="w-4 h-4 text-amber-500" />
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">ID: {c.patientId}</p>
+                      <p className="text-[10px] xl:text-xs text-slate-400 mt-1">ID: {c.patientId}</p>
                       <div className="status-popover-container relative mt-1.5" onClick={(e) => e.stopPropagation()}>
                         <div 
                           className="flex flex-wrap gap-1 cursor-pointer min-h-[20px] items-center" 
@@ -500,42 +570,42 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="text-[10px] font-bold px-2 py-1 bg-slate-100 rounded-md text-slate-600 whitespace-nowrap">
+                  <td className="px-2 xl:px-4 py-3 min-w-0">
+                    <span className="text-[9px] xl:text-[10px] font-bold px-1.5 xl:px-2 py-1 bg-slate-100 rounded-md text-slate-600 truncate max-w-full inline-block">
                       {c.branch}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs text-slate-700 font-medium min-w-[200px] leading-relaxed whitespace-normal break-words max-w-[300px] line-clamp-2">
+                  <td className="px-2 xl:px-4 py-3 min-w-0">
+                    <p className="text-[10px] xl:text-xs text-slate-700 font-medium leading-relaxed truncate" title={c.diagnosis || '-'}>
                       {c.diagnosis || '-'}
                     </p>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+                  <td className="px-2 xl:px-4 py-3 min-w-0">
+                    <div className="flex items-center gap-1.5 text-[10px] xl:text-xs font-medium text-slate-600 truncate">
                       {c.lastVisitDate ? new Date(c.lastVisitDate).toLocaleDateString() : '-'}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 whitespace-nowrap bg-indigo-50/50 px-2 py-1 rounded border border-indigo-100">
+                  <td className="px-2 xl:px-4 py-3 min-w-0">
+                    <div className="flex items-center gap-1.5 text-[10px] xl:text-xs font-bold text-indigo-700 truncate bg-indigo-50/50 px-1.5 xl:px-2 py-1 rounded border border-indigo-100">
                       {c.appointmentDate ? new Date(c.appointmentDate).toLocaleDateString() : '-'}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
+                  <td className="px-2 xl:px-4 py-3 text-[10px] xl:text-xs font-medium text-slate-600 truncate min-w-0">
                     {c.doctorInCharge}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-2 xl:px-4 py-3 align-top min-w-0">
                     <TagBadge tag={c.followUpTag} />
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-2 xl:px-4 py-3 align-top text-right">
+                    <div className="grid grid-cols-3 gap-1 w-fit ml-auto">
                       {c.patientPhone && (
                         <div className="relative group/btn flex items-center justify-center">
                           <a 
-                            href={formatWhatsAppLink(c.patientPhone) || '#'} 
+                            href={formatWhatsAppLink(c.patientPhone, getTemplateMessage(c.branch || 'All Branches', c.followUpTag || 'others', c)) || '#'} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                            className="flex items-center justify-center w-7 h-7 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
                           >
                             <MessageCircle className="w-4 h-4" />
                           </a>
@@ -612,10 +682,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                               }
                             }
                           }}
-                          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors font-bold text-[10px] uppercase tracking-wider"
+                          className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
                         >
-                          <Copy className="w-3.5 h-3.5" />
-                          Copy
+                          <Copy className="w-4 h-4 shrink-0" />
                         </button>
                         <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
                           Copy Notes for Plato
@@ -659,7 +728,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                                 console.error("Failed to shorten URL", err);
                               }
 
-                              const message = `Salam sejahtera ${c.patientName},\n\nSaya dari Klinik ARA 24 Jam. Terima kasih atas kepercayaan tuan/puan memilih kami untuk rawatan suntikan Mounjaro.\n\nBoleh tuan/puan isikan maklumat berat badan terkini dan kesan sampingan ubat (jika ada) melalui pautan rasmi berikut untuk semakan pihak doktor\n${finalUrl}\n\nTerima kasih 😊`;
+                              const message = getTemplateMessage(c.branch || 'All Branches', 'arawellness', c, finalUrl);
                               setShareModal({ 
                                 isOpen: true, 
                                 caseData: c, 
@@ -669,10 +738,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                                 instruction: 'Sila salin mesej di bawah dan hantar kepada pesakit melalui WhatsApp:'
                               });
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors font-bold text-[10px] uppercase tracking-wider"
+                            className="flex items-center justify-center w-7 h-7 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Share
+                            <ExternalLink className="w-4 h-4 shrink-0" />
                           </button>
                           <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
                             Share Wellness Form Link
@@ -685,7 +753,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              const message = `Salam tuan/puan, saya daripada Klinik ARA 24 Jam, terima kasih kerana mendapatkan perkhidmatan di klinik kami.\n\nBoleh saya tahu keadaan ${c.patientName} setelah dirujuk ke hospital tempoh hari?`;
+                              const message = getTemplateMessage(c.branch || 'All Branches', 'referral', c);
                               setShareModal({ 
                                 isOpen: true, 
                                 caseData: c, 
@@ -695,10 +763,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                                 instruction: 'Sila salin mesej di bawah dan hantar kepada pesakit melalui WhatsApp:'
                               });
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors font-bold text-[10px] uppercase tracking-wider"
+                            className="flex items-center justify-center w-7 h-7 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"
                           >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            Message
+                            <MessageCircle className="w-4 h-4 shrink-0" />
                           </button>
                           <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
                             WhatsApp Referral Message
@@ -712,10 +779,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                             e.stopPropagation();
                             onViewCase(c.id);
                           }}
-                          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors font-bold text-[10px] uppercase tracking-wider"
+                          className="flex items-center justify-center w-7 h-7 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
                         >
-                          View
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <ChevronRight className="w-4 h-4 shrink-0" />
                         </button>
                         <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
                           View Case Details
@@ -734,10 +800,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                                 isProcessing: false
                               });
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 transition-colors font-bold text-[10px] uppercase tracking-wider"
+                            className="flex items-center justify-center w-7 h-7 rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 transition-colors"
                           >
-                            <Undo2 className="w-3.5 h-3.5" />
-                            Return
+                            <Undo2 className="w-4 h-4 shrink-0" />
                           </button>
                           <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity">
                             Return to Directory
@@ -1028,6 +1093,115 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           </div>
         </div>
       )}
+
+      {/* WHATSAPP MANAGE TEMPLATES MODAL */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <div>
+                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-emerald-600" />
+                  Manage WhatsApp Templates
+                </h3>
+                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">Editing these templates will change the default message prefilled for patients.</p>
+              </div>
+              <button 
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="p-2 rounded-lg hover:bg-slate-200 text-slate-400 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto min-h-0 flex-1">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Branch</label>
+                  <select
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    value={selectedTemplateBranch}
+                    onChange={(e) => setSelectedTemplateBranch(e.target.value)}
+                  >
+                    <option value="All Branches">All Branches (Default)</option>
+                    <option value="Kajang">Kajang</option>
+                    <option value="Seri Kembangan">Seri Kembangan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Tag</label>
+                  <select
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    value={selectedTemplateTag}
+                    onChange={(e) => setSelectedTemplateTag(e.target.value)}
+                  >
+                    <option value="arawellness">ARAWELLNESS</option>
+                    <option value="referral">REFERRAL</option>
+                    <option value="aramommy">ARAMOMMY</option>
+                    <option value="arachronic">ARACHRONIC</option>
+                    <option value="others">OTHERS</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 md:p-4 mb-4">
+                <div className="flex gap-2.5">
+                  <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <Info className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-blue-900 mb-1">Available Variables</h4>
+                    <p className="text-[10px] md:text-xs text-blue-800/80 leading-relaxed">
+                      You can use <code className="bg-blue-100/50 px-1 py-0.5 rounded font-mono font-bold text-blue-700">{'{{nama}}'}</code> to insert the patient's name, and <code className="bg-blue-100/50 px-1 py-0.5 rounded font-mono font-bold text-blue-700">{'{{url}}'}</code> to insert the wellness form link (only applicable for ARAWELLNESS).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Message Template</label>
+                  <textarea 
+                    value={customTemplates[`${selectedTemplateBranch}|${selectedTemplateTag}`] ?? customTemplates[`All Branches|${selectedTemplateTag}`] ?? ''}
+                    onChange={(e) => {
+                      setCustomTemplates(prev => ({
+                        ...prev,
+                        [`${selectedTemplateBranch}|${selectedTemplateTag}`]: e.target.value
+                      }));
+                    }}
+                    className="w-full h-32 p-3 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 max-h-64"
+                    placeholder="Type your message template here..."
+                  />
+                  {selectedTemplateBranch !== 'All Branches' && customTemplates[`${selectedTemplateBranch}|${selectedTemplateTag}`] === undefined && (
+                    <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Currently using the "All Branches" default. Editing will overwrite for this branch.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 shrink-0 flex gap-3">
+              <button 
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="flex-1 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                   saveTemplates(customTemplates);
+                   setIsTemplateModalOpen(false);
+                }}
+                className="flex-[2] px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-indigo-950 transition-colors shadow-lg shadow-slate-200"
+              >
+                Save Templates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1047,7 +1221,7 @@ function TagBadge({ tag }: { tag: string }) {
 
   return (
     <span className={cn(
-      "px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider",
+      "inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-normal break-words text-center",
       styles[styleKey] || styles['others']
     )}>
       {displayTag}
