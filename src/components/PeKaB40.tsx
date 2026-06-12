@@ -109,7 +109,7 @@ const InlineDateCell = ({
   }, [initialValue]);
 
   return (
-    <div className="relative flex items-center gap-1.5 bg-slate-50 border border-slate-200 hover:border-slate-350 focus-within:border-indigo-600 focus-within:bg-white rounded-xl px-2 py-1 transition-all">
+    <div className="relative flex items-center gap-1.5 w-full min-w-0 bg-slate-50 border border-slate-200 hover:border-slate-350 focus-within:border-indigo-600 focus-within:bg-white rounded-xl px-2 py-1 transition-all overflow-hidden">
       <Calendar className="w-3.5 h-3.5 text-slate-400 pointer-events-none shrink-0" />
       <input
         type="date"
@@ -124,7 +124,7 @@ const InlineDateCell = ({
             e.currentTarget.showPicker();
           } catch (err) {}
         }}
-        className="w-full bg-transparent text-xs text-slate-800 font-bold focus:outline-none cursor-pointer"
+        className="w-full min-w-0 bg-transparent text-[10px] 2xl:text-xs text-slate-800 font-bold focus:outline-none cursor-pointer truncate"
       />
     </div>
   );
@@ -159,7 +159,7 @@ const InlineTimeCell = ({
         setVal(newVal);
         onSave(patientId, 'time', newVal);
       }}
-      className="px-2 py-1.5 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 rounded-xl outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/30"
+      className="w-full min-w-0 px-1 2xl:px-2 py-1.5 bg-slate-50 border border-slate-200 text-[10px] 2xl:text-xs font-bold text-slate-700 rounded-xl outline-none cursor-pointer hover:bg-slate-100 transition-colors focus:bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/30 truncate"
     >
       <option value="">- Time -</option>
       {timeOptions.map(t => (
@@ -195,7 +195,7 @@ const InlineBranchCell = ({
         setVal(newVal);
         onSave(patientId, 'branch', newVal);
       }}
-      className="px-2.5 py-1 text-[11px] font-black tracking-wide uppercase text-slate-700 bg-slate-100 border border-slate-200 rounded-xl outline-none cursor-pointer hover:bg-slate-200 transition-colors focus:bg-white focus:border-indigo-600"
+      className="w-full min-w-0 px-1 2xl:px-2.5 py-1 text-[9px] 2xl:text-[11px] font-black tracking-wide uppercase text-slate-700 bg-slate-100 border border-slate-200 rounded-xl outline-none cursor-pointer hover:bg-slate-200 transition-colors focus:bg-white focus:border-indigo-600 truncate"
     >
       <option value="Kajang">Kajang</option>
       <option value="Seri Kembangan">Seri Kembangan</option>
@@ -237,7 +237,7 @@ const InlineNotesCell = ({
           e.currentTarget.blur();
         }
       }}
-      className="w-full min-w-[120px] max-w-full text-xs text-slate-700 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 focus:bg-white focus:border-indigo-600 border border-slate-200 rounded-xl py-1 px-3 outline-none transition-all font-medium"
+      className="w-full min-w-0 text-[10px] 2xl:text-xs text-slate-700 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 focus:bg-white focus:border-indigo-600 border border-slate-200 rounded-xl py-1 px-2 2xl:px-3 outline-none transition-all font-medium"
     />
   );
 };
@@ -1056,7 +1056,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       </div>
 
       {/* Quick stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 md:grid-cols-3 gap-4">
         {/* Total Records */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
@@ -1108,7 +1108,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         </div>
 
         {/* Closed / Refused */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between col-span-2 md:col-span-1">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Closed / Refused</span>
             <span className="text-3xl font-black text-rose-600 block mt-1">
@@ -1117,6 +1117,19 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           </div>
           <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center shrink-0">
             <AlertCircle className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* Done */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-teal-700 uppercase tracking-widest block">Done</span>
+            <span className="text-3xl font-black text-teal-600 block mt-1">
+              {statsBaseList.filter(p => p.remarks === 'done pekab40').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-xl flex items-center justify-center shrink-0">
+            <CheckCircle className="w-6 h-6" />
           </div>
         </div>
       </div>
@@ -1290,7 +1303,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       </div>
 
       {/* Main Records Table */}
-      <div className="bg-white rounded-3xl overflow-hidden w-full max-w-full">
+      <div className="bg-white rounded-3xl overflow-hidden w-full">
         {isLoading ? (
           <div className="py-24 text-center">
             <RefreshCw className="w-10 h-10 text-indigo-950 animate-spin mx-auto mb-3" />
@@ -1305,50 +1318,60 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
             <p className="text-slate-400 text-xs mt-1">You can add individual records on top, or click `Import CSV` on top to upload your file.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse text-sm table-auto min-w-max">
+          <div className="w-full">
+            <table className="w-full text-left border-collapse text-sm table-fixed">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[8%]" />
+                <col className="w-[11%]" />
+                <col className="w-[14%]" />
+                <col className="w-[10%]" />
+                <col className="w-[18%]" />
+                <col className="w-[10%]" />
+                <col className="w-[11%]" />
+              </colgroup>
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200">
-                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name & IC</th>
-                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">PostalCode</th>
-                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-36">Next Appointment Date</th>
-                  <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest min-w-[140px]">Remarks</th>
-                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">Time</th>
-                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Additional Notes</th>
-                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">Cawangan</th>
-                  <th className="px-2 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24 text-right">Actions</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate">Name & IC</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate">PostalCode</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate">Next Appointment Date</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate">Remarks</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate">Time</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate">Additional Notes</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate">Cawangan</th>
+                  <th className="px-2 2xl:px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest truncate text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedPatients.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="px-3 py-3">
-                      <p className="text-sm font-bold text-slate-900 uppercase break-words leading-tight" title={p.name}>
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0 overflow-hidden">
+                      <p className="text-xs 2xl:text-sm font-bold text-slate-900 uppercase truncate" title={p.name}>
                         {p.name}
                       </p>
                       {p.ic && (
-                        <p className="text-xs text-slate-500 font-mono mt-0.5">
+                        <p className="text-[10px] 2xl:text-xs text-slate-500 font-mono mt-0.5 truncate" title={p.ic}>
                           IC: {p.ic}
                         </p>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-xs text-slate-500 font-mono break-all">
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 text-[10px] 2xl:text-xs text-slate-500 font-mono truncate min-w-0" title={p.postalCode}>
                       {p.postalCode || '-'}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0">
                       <InlineDateCell
                         patientId={p.id}
                         initialValue={p.appointmentDate}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap min-w-[140px]">
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0">
                       <select
                         value={String(p.remarks || 'not contacted yet').trim().toLowerCase()}
                         onChange={(e) => handleUpdateRemarks(p.id, e.target.value)}
                         className={cn(
                           getStatusBadgeClass(p.remarks || 'not contacted yet'),
-                          "w-full min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px] sm:text-[11px]"
+                          "w-full min-w-0 overflow-hidden text-ellipsis cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px] sm:text-[11px]"
                         )}
                       >
                         {remarksOptions.map(option => (
@@ -1363,53 +1386,55 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                         )}
                       </select>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap min-w-[90px]">
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0">
                       <InlineTimeCell
                         patientId={p.id}
                         initialValue={p.time}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-3 py-3 min-w-[150px]">
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0">
                       <InlineNotesCell
                         patientId={p.id}
                         initialValue={p.additionalNotes}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0">
                       <InlineBranchCell
                         patientId={p.id}
                         initialValue={p.branch}
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-2 py-3 whitespace-nowrap text-right">
+                    <td className="px-2 2xl:px-3 py-2 2xl:py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {p.phone && (
                           <button
                             onClick={() => handleOpenWhatsApp(p)}
-                            className="p-1 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
+                            className="p-1.5 2xl:px-2 2xl:py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center justify-center gap-1 text-xs font-bold cursor-pointer min-w-0 flex-shrink-0"
                             title="Send WhatsApp Message"
                           >
                             <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.456h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                             </svg>
-                            WhatsApp
+                            <span className="hidden 2xl:inline">WhatsApp</span>
                           </button>
                         )}
                         <button
                           onClick={() => handleOpenEdit(p)}
-                          className="p-1 px-2 border border-slate-200 text-slate-600 hover:text-indigo-950 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer font-sans"
+                          className="p-1.5 2xl:px-2 2xl:py-1 border border-slate-200 text-slate-600 hover:text-indigo-950 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center gap-1 text-xs font-bold cursor-pointer font-sans min-w-0 flex-shrink-0"
+                          title="Edit Patient"
                         >
-                          <FileEdit className="w-3 h-3" />
-                          Edit
+                          <FileEdit className="w-3.5 h-3.5 shrink-0" />
+                          <span className="hidden 2xl:inline">Edit</span>
                         </button>
                         <button
                           onClick={() => handleDeletePatient(p)}
-                          className="p-1 text-rose-600 hover:text-rose-850 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                          className="p-1.5 text-rose-600 hover:text-rose-850 hover:bg-rose-50 rounded-lg transition-all cursor-pointer flex-shrink-0"
+                          title="Delete Patient"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 shrink-0" />
                         </button>
                       </div>
                     </td>
