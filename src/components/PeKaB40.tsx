@@ -237,7 +237,7 @@ const InlineNotesCell = ({
           e.currentTarget.blur();
         }
       }}
-      className="w-full min-w-[170px] max-w-[250px] text-xs text-slate-700 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 focus:bg-white focus:border-indigo-600 border border-slate-200 rounded-xl py-1 px-3 outline-none transition-all font-medium"
+      className="w-full min-w-[120px] max-w-full text-xs text-slate-700 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300 focus:bg-white focus:border-indigo-600 border border-slate-200 rounded-xl py-1 px-3 outline-none transition-all font-medium"
     />
   );
 };
@@ -981,25 +981,25 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   const getStatusBadgeClass = (status: string) => {
     const s = String(status || '').trim().toLowerCase();
     if (s === 'appt given' || s === 'appt date given') {
-      return 'bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
     if (s === 'done pekab40') {
-      return 'bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
+      return 'bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
     if (s === 'to call again' || s === 'whatsapp sent') {
-      return 'bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
     if (s === 'not contacted yet') {
-      return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
+      return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
     if (s === 'refuse') {
-      return 'bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
+      return 'bg-amber-50 text-amber-700 border border-amber-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
-    return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
+    return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full">
       {/* Upper Header Panel */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1290,7 +1290,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       </div>
 
       {/* Main Records Table */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+      <div className="bg-white rounded-3xl overflow-hidden w-full max-w-full">
         {isLoading ? (
           <div className="py-24 text-center">
             <RefreshCw className="w-10 h-10 text-indigo-950 animate-spin mx-auto mb-3" />
@@ -1305,14 +1305,14 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
             <p className="text-slate-400 text-xs mt-1">You can add individual records on top, or click `Import CSV` on top to upload your file.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse text-sm table-auto max-w-full">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200">
                   <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name & IC</th>
                   <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">PostalCode</th>
                   <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-36">Next Appointment Date</th>
-                  <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-[140px]">Remarks</th>
+                  <th className="px-4 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest min-w-[140px]">Remarks</th>
                   <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-20">Time</th>
                   <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Additional Notes</th>
                   <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest w-24">Cawangan</th>
@@ -1342,13 +1342,13 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                         onSave={handleUpdateField}
                       />
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap max-w-[140px]">
+                    <td className="px-4 py-3 whitespace-nowrap min-w-[140px]">
                       <select
                         value={String(p.remarks || 'not contacted yet').trim().toLowerCase()}
                         onChange={(e) => handleUpdateRemarks(p.id, e.target.value)}
                         className={cn(
                           getStatusBadgeClass(p.remarks || 'not contacted yet'),
-                          "w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_6px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px]"
+                          "w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px] sm:text-xs"
                         )}
                       >
                         {remarksOptions.map(option => (
