@@ -999,7 +999,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   };
 
   return (
-    <div className="space-y-6 w-full max-w-full">
+    <div className="space-y-6 w-full flex-1 px-4 sm:px-6 lg:px-8 max-w-full">
       {/* Upper Header Panel */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1306,7 +1306,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           </div>
         ) : (
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse text-sm table-auto max-w-full">
+            <table className="w-full text-left border-collapse text-sm table-auto min-w-max">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-200">
                   <th className="px-3 py-3 text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Name & IC</th>
@@ -1348,7 +1348,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                         onChange={(e) => handleUpdateRemarks(p.id, e.target.value)}
                         className={cn(
                           getStatusBadgeClass(p.remarks || 'not contacted yet'),
-                          "w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px] sm:text-xs"
+                          "w-full min-w-[140px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px] sm:text-[11px]"
                         )}
                       >
                         {remarksOptions.map(option => (
