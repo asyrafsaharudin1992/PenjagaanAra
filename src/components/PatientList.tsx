@@ -377,12 +377,20 @@ export default function PatientList({ currentUser }: PatientListProps) {
       )}
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
+        <div className="w-full">
+          <table className="w-full text-left border-collapse table-fixed">
+            <colgroup>
+              {['Superadmin', 'Admin'].includes(currentUser.role) && <col className="w-[5%]" />}
+              <col className="w-[40%]" />
+              <col className="w-[15%]" />
+              <col className="w-[15%]" />
+              <col className="w-[15%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
                 {['Superadmin', 'Admin'].includes(currentUser.role) && (
-                  <th className="w-12 px-6 py-4">
+                  <th className="px-2 xl:px-4 py-4 text-center">
                     <input 
                       type="checkbox"
                       checked={paginatedPatients.length > 0 && paginatedPatients.every(p => selectedPatientIds.includes(p.id))}
@@ -399,11 +407,11 @@ export default function PatientList({ currentUser }: PatientListProps) {
                     />
                   </th>
                 )}
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Patient Details</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Branch</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Import Tag</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Added On</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-2 xl:px-4 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Patient Details</th>
+                <th className="px-2 xl:px-4 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Branch</th>
+                <th className="px-2 xl:px-4 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Import Tag</th>
+                <th className="px-2 xl:px-4 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">Added On</th>
+                <th className="px-2 xl:px-4 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right truncate">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -412,7 +420,7 @@ export default function PatientList({ currentUser }: PatientListProps) {
                 return (
                   <tr key={p.id} className={cn("hover:bg-slate-50/50 transition-colors", isSelected && "bg-slate-50/80")}>
                     {['Superadmin', 'Admin'].includes(currentUser.role) && (
-                      <td className="px-6 py-4 w-12">
+                      <td className="px-2 xl:px-4 py-4 w-12 text-center">
                         <input 
                           type="checkbox"
                           checked={isSelected}
@@ -427,71 +435,71 @@ export default function PatientList({ currentUser }: PatientListProps) {
                         />
                       </td>
                     )}
-                    <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-950">
-                        <User className="w-5 h-5" />
+                    <td className="px-2 xl:px-4 py-4 min-w-0 align-top">
+                    <div className="flex items-start gap-3 w-full">
+                      <div className="w-8 h-8 xl:w-10 xl:h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-950 shrink-0 mt-1">
+                        <User className="w-4 h-4 xl:w-5 xl:h-5" />
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-slate-400 font-medium">ID: {p.patientId}</span>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                            <Phone className="w-3 h-3" />
-                            {p.phone}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-slate-800 whitespace-normal break-words leading-snug text-sm">
+                          {p.name}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="text-[10px] text-slate-400 font-medium shrink-0">ID: {p.patientId}</span>
+                          <span className="text-slate-300 hidden sm:inline">•</span>
+                          <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1 shrink-0 text-left" title={p.phone}>
+                            <Phone className="w-3 h-3 shrink-0" />
+                            <span>{p.phone}</span>
                           </span>
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 uppercase">
-                      <MapPin className="w-3 h-3" />
-                      {p.branch}
+                  <td className="px-2 xl:px-4 py-4 min-w-0 align-top">
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-normal break-words text-center bg-slate-100 text-slate-600 uppercase">
+                      <MapPin className="w-3 h-3 shrink-0" />
+                      {p.branch || 'Unknown'}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 rounded-lg text-[10px] font-bold text-indigo-950 uppercase border border-indigo-100">
-                      <Tag className="w-3 h-3" />
+                  <td className="px-2 xl:px-4 py-4 min-w-0 align-top">
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-normal break-words text-center bg-indigo-50 text-indigo-950 uppercase border border-indigo-100">
+                      <Tag className="w-3 h-3 shrink-0" />
                       {p.tag}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {new Date(p.createdAt).toLocaleDateString()}
+                  <td className="px-2 xl:px-4 py-4 min-w-0 align-top">
+                    <div className="flex items-center gap-1 xl:gap-1.5 text-[10px] xl:text-xs text-slate-500">
+                      <Calendar className="w-3.5 h-3.5 shrink-0" />
+                      <span>{new Date(p.createdAt).toLocaleDateString()}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-2 xl:px-4 py-4 text-right min-w-0 align-top">
+                    <div className="grid grid-cols-3 gap-1 w-fit ml-auto">
                       <button 
                         onClick={() => handleMoveToFollowUp(p)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-950 text-white rounded-lg text-[10px] font-bold hover:bg-slate-900 transition-all uppercase tracking-wider"
+                        className="flex items-center justify-center w-7 h-7 bg-indigo-950 text-white rounded-lg hover:bg-slate-900 transition-all shadow-sm"
                         title="Move to Follow-up Cases"
                       >
-                        <ClipboardList className="w-3.5 h-3.5" />
-                        MOVE
+                        <ClipboardList className="w-4 h-4 shrink-0" />
                       </button>
                       
                       <a 
                         href={formatWhatsAppLink(p.phone)} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold hover:bg-emerald-100 transition-all uppercase tracking-wider shadow-sm shadow-emerald-100/50"
+                        className="flex items-center justify-center w-7 h-7 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all shadow-sm shadow-emerald-100/50"
                         title="WhatsApp Patient"
                       >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        WHATSAPP
+                        <MessageCircle className="w-4 h-4 shrink-0" />
                       </a>
 
                       {['Superadmin', 'Admin'].includes(currentUser.role) && (
                         <button 
                           onClick={() => handleDeletePatient(p.id, p.name)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                          className="flex items-center justify-center w-7 h-7 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
                           title="Delete Patient"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 shrink-0" />
                         </button>
                       )}
                     </div>
