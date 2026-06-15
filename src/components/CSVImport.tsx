@@ -73,7 +73,7 @@ export default function CSVImport({ onClose, onImportComplete, defaultBranch, cu
   const [selectedTag, setSelectedTag] = useState<string>('Follow-up');
   const [availableBranches, setAvailableBranches] = useState<string[]>(['Kajang', 'Seri Kembangan']);
   const [availableTags, setAvailableTags] = useState<string[]>(availableSystemTags.length > 0 ? availableSystemTags : [
-    'Referral', 'AraMommy', 'AraWellness', 'AraChronic', 'Follow-up', 'Routine', 'Emergency', 'Others'
+    'Referral', 'AraMommy', 'AraSihat', 'AraWellness', 'AraChronic', 'Follow-up', 'Routine', 'Emergency', 'Others'
   ]);
 
   // Fetch real branches and tags from Firestore
