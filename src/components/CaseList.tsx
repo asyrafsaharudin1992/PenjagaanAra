@@ -46,6 +46,7 @@ const defaultTemplates: Record<string, string> = {
   'All Branches|referral': `Salam tuan/puan, saya daripada Klinik ARA 24 Jam, terima kasih kerana mendapatkan perkhidmatan di klinik kami.\n\nBoleh saya tahu keadaan {{nama}} setelah dirujuk ke hospital tempoh hari?`,
   'All Branches|aramommy': `Salam puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam berkenaan temu janji ARAMOMMY.`,
   'All Branches|arachronic': `Salam tuan/puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam untuk pemeriksaan penyakit kronik.`,
+  'All Branches|arasihat': `Salam tuan/puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam berkenaan pemeriksaan saringan kesihatan AraSihat anda.`,
   'All Branches|others': `Salam tuan/puan {{nama}},\n\nIni adalah mesej susulan dari Klinik ARA 24 Jam.`,
 };
 
@@ -1139,6 +1140,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                     <option value="referral">REFERRAL</option>
                     <option value="aramommy">ARAMOMMY</option>
                     <option value="arachronic">ARACHRONIC</option>
+                    <option value="arasihat">ARASIHAT</option>
                     <option value="others">OTHERS</option>
                   </select>
                 </div>
@@ -1214,6 +1216,7 @@ function TagBadge({ tag }: { tag: string }) {
   const styles: Record<string, string> = {
     'aramommy': "bg-pink-50 text-pink-700 border-pink-100",
     'arachronic': "bg-blue-50 text-blue-700 border-blue-100",
+    'arasihat': "bg-teal-50 text-teal-700 border-teal-100",
     'arawellness': "bg-emerald-50 text-emerald-700 border-emerald-100",
     'referral': "bg-indigo-50 text-indigo-950 border-indigo-100",
     'others': "bg-slate-50 text-slate-700 border-slate-100",
