@@ -135,7 +135,7 @@ export default function CaseDetails({
 
   // Fetch tags dynamically
   useEffect(() => {
-    const defaultTags = ['AraMommy', 'AraChronic', 'AraWellness', 'Referral', 'Others'];
+    const defaultTags = ['AraMommy', 'AraChronic', 'AraSihat', 'AraWellness', 'Referral', 'Others'];
     
     const q = query(collection(db, 'tags'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
