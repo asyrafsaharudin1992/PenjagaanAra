@@ -22,6 +22,7 @@ export function normalizeTag(tag: string): string {
   const t = tag.toLowerCase().trim();
   if (t === 'aramommy' || t.includes('mommy')) return 'AraMommy';
   if (t === 'arachronic' || t.includes('chronic')) return 'AraChronic';
+  if (t === 'arasihat' || t.includes('sihat')) return 'AraSihat';
   if (t === 'arawellness' || t.includes('wellness') || t.includes('weight loss')) return 'AraWellness';
   if (t === 'referral' || t.includes('referral cases')) return 'Referral';
   if (t === 'others') return 'Others';
