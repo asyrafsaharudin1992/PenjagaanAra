@@ -414,6 +414,7 @@ export default function App() {
       const t = tag.toLowerCase().trim();
       if (t === 'aramommy' || t.includes('mommy')) return 'AraMommy';
       if (t === 'arachronic' || t.includes('chronic')) return 'AraChronic';
+      if (t === 'arasihat' || t.includes('sihat')) return 'AraSihat';
       if (t === 'arawellness' || t.includes('wellness') || t.includes('weight loss')) return 'AraWellness';
       if (t === 'referral' || t.includes('referral cases')) return 'Referral';
       return tag.trim();
@@ -424,7 +425,7 @@ export default function App() {
       if (c.followUpTag) seen.add(normalizeTag(c.followUpTag));
     });
     // Add default fallbacks if not present
-    ['Referral', 'AraMommy', 'AraWellness', 'AraChronic', 'Routine', 'Follow-up', 'Others'].forEach(t => seen.add(t));
+    ['Referral', 'AraMommy', 'AraSihat', 'AraWellness', 'AraChronic', 'Routine', 'Follow-up', 'Others'].forEach(t => seen.add(t));
     return Array.from(seen).sort();
   }, [cases]);
 
