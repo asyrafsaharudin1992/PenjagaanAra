@@ -8,7 +8,8 @@ import {
   Calendar as CalendarIcon,
   ClipboardList,
   ChevronDown,
-  Filter
+  Filter,
+  HeartPulse
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -314,21 +315,26 @@ export default function Dashboard({ cases, userName, onFilterByTag }: DashboardP
             <CalendarIcon className="w-4 h-4 text-slate-400" />
           </div>
           <div className="space-y-4">
-            {recentCases.map((c) => (
-              <div key={c.id} className="flex items-start gap-3 pb-4 border-bottom border-slate-50 last:border-0">
-                <div className={cn(
-                  "mt-1 w-2 h-2 rounded-full shrink-0",
-                  c.followUpTag === 'AraMommy' ? "bg-pink-500" : 
-                  c.followUpTag === 'AraWellness (weight loss)' ? "bg-emerald-500" : 
-                  c.followUpTag === 'Referral' ? "bg-indigo-500" : "bg-slate-400"
-                )} />
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{c.patientName}</p>
-                  <p className="text-xs text-slate-500 line-clamp-1">{c.diagnosis}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">{new Date(c.createdAt).toLocaleDateString()}</p>
+            {recentCases.map((c) => {
+              const tagNormalized = normalizeTag(c.followUpTag || 'Others');
+              return (
+                <div key={c.id} className="flex items-start gap-3 pb-4 border-bottom border-slate-50 last:border-0">
+                  <div className={cn(
+                    "mt-1 w-2 h-2 rounded-full shrink-0",
+                    tagNormalized === 'AraMommy' ? "bg-pink-500" : 
+                    tagNormalized === 'AraWellness' ? "bg-emerald-500" : 
+                    tagNormalized === 'AraSihat' ? "bg-teal-500" :
+                    tagNormalized === 'AraChronic' ? "bg-blue-500" :
+                    tagNormalized === 'Referral' ? "bg-indigo-500" : "bg-slate-400"
+                  )} />
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{c.patientName}</p>
+                    <p className="text-xs text-slate-500 line-clamp-1">{c.diagnosis}</p>
+                    <p className="text-[10px] text-slate-400 mt-1">{new Date(c.createdAt).toLocaleDateString()}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -342,6 +348,7 @@ function getTagColor(tag: string): string {
   const t = normalizeTag(tag);
   if (t === 'AraMommy') return 'pink';
   if (t === 'AraWellness') return 'emerald';
+  if (t === 'AraSihat') return 'teal';
   if (t === 'AraChronic') return 'blue';
   if (t === 'Referral') return 'indigo';
   return 'slate';
@@ -351,6 +358,7 @@ function getTagIcon(tag: string) {
   const t = normalizeTag(tag);
   if (t === 'AraMommy') return Users;
   if (t === 'AraWellness') return TrendingUp;
+  if (t === 'AraSihat') return HeartPulse;
   if (t === 'Referral') return AlertCircle;
   if (t === 'AraChronic') return ClipboardList;
   return CheckCircle2;
@@ -363,6 +371,7 @@ function StatCard({ title, value, icon: Icon, color, trend }: any) {
     pink: "bg-pink-50 text-pink-600 border-pink-100",
     blue: "bg-blue-50 text-blue-600 border-blue-100",
     emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
+    teal: "bg-teal-50 text-teal-600 border-teal-100",
     slate: "bg-slate-50 text-slate-600 border-slate-100",
   };
 
