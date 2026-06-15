@@ -77,7 +77,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
 
   // Fetch tags dynamically with error handling - MERGE with defaults
   useEffect(() => {
-    const defaultTags = ['AraMommy', 'AraChronic', 'AraWellness', 'Referral', 'Others'];
+    const defaultTags = ['AraMommy', 'AraChronic', 'AraSihat', 'AraWellness', 'Referral', 'Others'];
     
     try {
       // Try to fetch from Firestore, but don't use orderBy to avoid index requirement
