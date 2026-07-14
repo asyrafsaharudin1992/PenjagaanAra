@@ -77,6 +77,13 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [historyPatientId, setHistoryPatientId] = useState<string | null>(null);
+
+  // States for "Update Doctor" tab
+  const [activeTab, setActiveTab] = useState<'all' | 'update_doctor'>('all');
+  const [selectedDoctor, setSelectedDoctor] = useState<string>('');
+  const [doctorStartDate, setDoctorStartDate] = useState<string>('');
+  const [doctorEndDate, setDoctorEndDate] = useState<string>('');
+  const [isCopied, setIsCopied] = useState(false);
   // Derive available tags directly from cases prop so the dropdown always
   // reflects real data — no separate Firestore collection to maintain,
   // and new tags added to cases appear immediately.
@@ -371,6 +378,127 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
 
   const historyPatientName = patientHistory[0]?.patientName || '';
 
+  const uniqueDoctors = useMemo(() => {
+    const doctors = new Set<string>();
+    cases.forEach(c => {
+      if (c.doctorInCharge && c.doctorInCharge.trim() !== '') {
+        const parsed = c.doctorInCharge.split(/[\/\\,&]|\band\b/i).map(d => d.trim()).filter(d => d.length > 0);
+        parsed.forEach(doc => {
+          // Exclude names that start with "Dr" or "Dr."
+          if (/^(dr\b|dr\.)/i.test(doc)) {
+            return;
+          }
+          const formatted = doc.replace(/\b\w/g, l => l.toUpperCase());
+          doctors.add(formatted);
+        });
+      }
+    });
+    return Array.from(doctors).sort((a, b) => a.localeCompare(b));
+  }, [cases]);
+
+  const doctorPatients = useMemo(() => {
+    if (!selectedDoctor) return [];
+    
+    return cases.filter(c => {
+      if (!c.doctorInCharge || c.doctorInCharge.trim() === '') {
+        return false;
+      }
+      
+      const parsed = c.doctorInCharge.split(/[\/\\,&]|\band\b/i).map(d => d.trim()).filter(d => d.length > 0);
+      const isMatch = parsed.some(doc => {
+        if (/^(dr\b|dr\.)/i.test(doc)) {
+          return false;
+        }
+        const formatted = doc.replace(/\b\w/g, l => l.toUpperCase());
+        return formatted.toLowerCase() === selectedDoctor.toLowerCase();
+      });
+      
+      if (!isMatch) {
+        return false;
+      }
+      
+      // Must have remarks (update taken from remarks box)
+      if (!c.remarks || c.remarks.trim() === '') {
+        return false;
+      }
+      
+      // Filter by last visit date
+      if (!c.lastVisitDate) return false;
+      
+      const visitDateObj = new Date(c.lastVisitDate);
+      if (isNaN(visitDateObj.getTime())) return false;
+      visitDateObj.setHours(0, 0, 0, 0);
+      
+      if (doctorStartDate) {
+        const start = new Date(doctorStartDate);
+        start.setHours(0, 0, 0, 0);
+        if (visitDateObj < start) return false;
+      }
+      
+      if (doctorEndDate) {
+        const end = new Date(doctorEndDate);
+        end.setHours(0, 0, 0, 0);
+        if (visitDateObj > end) return false;
+      }
+      
+      return true;
+    }).sort((a, b) => new Date(b.lastVisitDate || b.createdAt).getTime() - new Date(a.lastVisitDate || a.createdAt).getTime());
+  }, [cases, selectedDoctor, doctorStartDate, doctorEndDate]);
+
+  const generatedReportText = useMemo(() => {
+    if (!selectedDoctor || doctorPatients.length === 0) return '';
+    
+    let reportText = `*PATIENT UPDATES FOR DR. ${selectedDoctor.toUpperCase()}*\n`;
+    if (doctorStartDate || doctorEndDate) {
+      const startStr = doctorStartDate ? new Date(doctorStartDate).toLocaleDateString('en-GB') : 'Start';
+      const endStr = doctorEndDate ? new Date(doctorEndDate).toLocaleDateString('en-GB') : 'End';
+      reportText += `Period (Last Visit): ${startStr} to ${endStr}\n`;
+    }
+    reportText += `\nWe have been following up on our referred cases, and these are the updates from your patients who responded. Please note that this information comes directly from them, so it may be incomplete.\n`;
+    reportText += `\n[⚠️ DISCLAIMER: This update is from patient only, so the information may be inadequate.]\n\n`;
+    
+    doctorPatients.forEach((p, idx) => {
+      const visitDateStr = p.lastVisitDate ? new Date(p.lastVisitDate).toLocaleDateString('en-GB') : '-';
+      const followUpDateStr = p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB') : '-';
+      reportText += `${idx + 1}. *${p.patientName}* (ID: ${p.patientId})\n`;
+      reportText += `   - Last Visit Date: ${visitDateStr}\n`;
+      reportText += `   - Follow Up Date: ${followUpDateStr}\n`;
+      if (p.diagnosis) {
+        reportText += `   - Diagnosis: ${p.diagnosis}\n`;
+      }
+      reportText += `   - Update: ${p.remarks}\n\n`;
+    });
+    
+    return reportText.trim();
+  }, [doctorPatients, selectedDoctor, doctorStartDate, doctorEndDate]);
+
+  const copyReportToClipboard = () => {
+    const reportText = generatedReportText;
+    if (!reportText) return;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(reportText);
+      toast.success("Report copied to clipboard!");
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } else {
+      // Fallback
+      const textArea = document.createElement("textarea");
+      textArea.value = reportText;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        toast.success("Report copied to clipboard!");
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (err) {
+        toast.error("Failed to copy report. Please copy manually.");
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   const formatWhatsAppLink = (phone?: string, message?: string) => {
     if (!phone) return null;
     // Remove non-digit characters
@@ -387,13 +515,43 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-2">
-        <div className="shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+        <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight whitespace-nowrap">Follow-up Cases</h2>
           <p className="text-slate-500 text-sm mt-1">Manage and track all patient follow-up requests.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 justify-end">
-          <div className="relative group/search">
+        
+        {/* Modern Tab Switcher */}
+        <div className="bg-slate-100 p-1 rounded-xl flex self-start md:self-auto shrink-0 border border-slate-200/50">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-bold transition-all uppercase tracking-wider",
+              activeTab === 'all'
+                ? "bg-white text-indigo-950 shadow-sm"
+                : "text-slate-600 hover:text-slate-950"
+            )}
+          >
+            All Cases
+          </button>
+          <button
+            onClick={() => setActiveTab('update_doctor')}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-bold transition-all uppercase tracking-wider flex items-center gap-1.5",
+              activeTab === 'update_doctor'
+                ? "bg-white text-indigo-950 shadow-sm"
+                : "text-slate-600 hover:text-slate-950"
+            )}
+          >
+            Update Doctor
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'all' ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2 justify-end">
+            <div className="relative group/search">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within/search:text-indigo-950 transition-colors" />
             <input 
               type="text"
@@ -468,7 +626,6 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
             TEMPLATES
           </button>
         </div>
-      </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="w-full">
@@ -869,8 +1026,220 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           </div>
         )}
       </div>
+    </>
+  ) : (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      {/* Controls Panel */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 tracking-tight">Generate Doctor Patient Updates</h3>
+            <p className="text-slate-500 text-xs mt-0.5">Filter patients with follow-up remarks by doctor and last visit date range.</p>
+          </div>
+          
+          {doctorPatients.length > 0 && (
+            <button
+              onClick={copyReportToClipboard}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-colors shadow-sm self-stretch md:self-auto justify-center",
+                isCopied 
+                  ? "bg-emerald-600 text-white" 
+                  : "bg-slate-900 hover:bg-slate-800 text-white"
+              )}
+            >
+              {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {isCopied ? "COPIED!" : "COPY REPORT"}
+            </button>
+          )}
+        </div>
 
-      {/* Patient History Modal */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Doctor</label>
+            <select
+              value={selectedDoctor}
+              onChange={(e) => setSelectedDoctor(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+            >
+              <option value="">-- Choose a Doctor --</option>
+              {uniqueDoctors.map(docName => (
+                <option key={docName} value={docName}>{docName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Start Date (Last Visit)</label>
+            <input
+              type="date"
+              value={doctorStartDate}
+              onChange={(e) => setDoctorStartDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">End Date (Last Visit)</label>
+            <input
+              type="date"
+              value={doctorEndDate}
+              onChange={(e) => setDoctorEndDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Disclaimer Alert Box */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+        <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5 text-amber-700">
+          <Info className="w-4 h-4" />
+        </div>
+        <div>
+          <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Disclaimer</h4>
+          <p className="text-xs text-amber-800 leading-relaxed mt-1">
+            This update is from patient only, so the information may be inadequate.
+          </p>
+        </div>
+      </div>
+
+      {/* Compiled Copy-Paste Block */}
+      {selectedDoctor && doctorPatients.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                📋 WhatsApp-Ready Compiled Report
+              </h4>
+            </div>
+            <button
+              onClick={copyReportToClipboard}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm",
+                isCopied 
+                  ? "bg-emerald-600 text-white" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              )}
+            >
+              {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {isCopied ? "COPIED!" : "COPY ENTIRE MESSAGE"}
+            </button>
+          </div>
+          <div className="relative">
+            <textarea
+              readOnly
+              value={generatedReportText}
+              className="w-full h-64 p-4 bg-slate-900 text-slate-100 font-mono text-xs rounded-xl border border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none leading-relaxed"
+              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            />
+            <div className="absolute bottom-3 right-3 text-[10px] text-slate-400 font-medium bg-slate-800/85 px-2.5 py-1 rounded-md backdrop-blur-sm pointer-events-none border border-slate-700/50">
+              Click inside to select all
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Results */}
+      {!selectedDoctor ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+          <User className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h4 className="text-sm font-bold text-slate-700">No Doctor Selected</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Please choose a doctor in charge from the dropdown above to generate patient updates.</p>
+        </div>
+      ) : doctorPatients.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+          <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <h4 className="text-sm font-bold text-slate-700">No Patient Updates Found</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            There are no patients assigned to <strong className="text-slate-700">{selectedDoctor}</strong> who have last visit dates matching this period with follow-up remarks.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Showing {doctorPatients.length} patient {doctorPatients.length === 1 ? 'update' : 'updates'}
+            </span>
+            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+              {selectedDoctor}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {doctorPatients.map((p) => (
+              <div 
+                key={p.id} 
+                className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+                onClick={() => onViewCase(p.id)}
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h4 className="font-bold text-slate-900 group-hover:text-indigo-600 group-hover:underline text-sm leading-tight transition-colors">
+                        {p.patientName}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5 font-mono">ID: {p.patientId}</p>
+                    </div>
+                    <TagBadge tag={p.followUpTag} />
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] border-b border-slate-100 pb-3 mb-3">
+                    <div>
+                      <span className="text-slate-400 font-bold uppercase tracking-wider block">Last Visit Date</span>
+                      <span className="text-slate-700 font-bold mt-0.5 block">
+                        {p.lastVisitDate ? new Date(p.lastVisitDate).toLocaleDateString('en-GB') : '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-bold uppercase tracking-wider block">Follow Up Date</span>
+                      <span className="text-slate-700 font-bold mt-0.5 block">
+                        {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB') : '-'}
+                      </span>
+                    </div>
+                    {p.appointmentDate ? (
+                      <div>
+                        <span className="text-indigo-400 font-bold uppercase tracking-wider block">Appt Date</span>
+                        <span className="text-indigo-700 font-bold mt-0.5 block">
+                          {new Date(p.appointmentDate).toLocaleDateString('en-GB')}
+                        </span>
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Diagnosis</span>
+                      <p className="text-xs text-slate-700 font-medium mt-0.5 line-clamp-2">{p.diagnosis || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider block">Patient Update / Remarks</span>
+                      <div className="mt-1.5 p-3 bg-slate-50 rounded-xl border border-slate-100 relative">
+                        <p className="text-xs text-slate-800 font-medium leading-relaxed italic whitespace-pre-wrap text-left">
+                          "{p.remarks}"
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Branch: <strong className="text-slate-600">{p.branch}</strong></span>
+                  <span className="text-indigo-600 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                    View Details <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+
+  {/* Patient History Modal */}
       {historyPatientId && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
