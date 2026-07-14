@@ -464,9 +464,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
       reportText += `   - Last Visit Date: ${visitDateStr}\n`;
       reportText += `   - Follow Up Date: ${followUpDateStr}\n`;
       if (p.diagnosis) {
-        reportText += `   - Diagnosis: ${p.diagnosis}\n`;
+        reportText += `   - Diagnosis during referral: ${p.diagnosis}\n`;
       }
-      reportText += `   - Update: ${p.remarks}\n\n`;
+      reportText += `   - Follow-up remarks: ${p.remarks}\n\n`;
     });
     
     return reportText.trim();
