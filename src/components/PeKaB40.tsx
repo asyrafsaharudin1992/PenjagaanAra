@@ -318,7 +318,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     let defaultTmpl: keyof WhatsAppTemplates = 'not_contacted';
     
     if (statusVal === 'appt given') defaultTmpl = 'appt_given';
-    else if (statusVal === 'to call again') defaultTmpl = 'follow_up';
+    else if (statusVal === 'contacted' || statusVal === 'to call again') defaultTmpl = 'follow_up';
     
     setWhatsappSelectedTemplate(defaultTmpl);
     setWhatsappMessage(compileMessage(customTemplates[defaultTmpl], p));
@@ -383,7 +383,8 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   // Dropdown options for remarks/status
   const remarksOptions = [
     'refuse',
-    'to call again',
+    'contacted',
+    'unable to contact',
     'appt given',
     'not contacted yet',
     'done pekab40'
@@ -410,6 +411,15 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       return 'appt given';
     }
     if (
+      clean === 'unable to contact' ||
+      clean.includes('unable to contact') ||
+      clean.includes('cannot contact') ||
+      clean.includes('uncontactable')
+    ) {
+      return 'unable to contact';
+    }
+    if (
+      clean === 'contacted' ||
       clean === 'to call again' || 
       clean.includes('call again') || 
       clean.includes('hubungi semula') || 
@@ -420,7 +430,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       clean.includes('out of service') || 
       clean.includes('contact again')
     ) {
-      return 'to call again';
+      return 'contacted';
     }
     if (clean.includes('not contacted') || clean.includes('belum hubung') || clean.includes('belum')) {
       return 'not contacted yet';
@@ -435,8 +445,13 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   const formatRemarkOption = (option: string) => {
     if (!option) return '';
     const o = option.trim().toLowerCase();
-    if (o === 'done pekab40') return 'Done PeKaB40';
+    if (o === 'done pekab40') return 'Done PeKa B40';
     if (o === 'appt given') return 'Appt Given';
+    if (o === 'contacted') return 'Contacted';
+    if (o === 'to call again') return 'Contacted';
+    if (o === 'unable to contact') return 'Unable to contact';
+    if (o === 'not contacted yet') return 'Not Contacted Yet';
+    if (o === 'refuse') return 'Closed / Refused';
     return o.replace(/\b\w/g, c => c.toUpperCase());
   };
 
@@ -1013,8 +1028,11 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     if (s === 'done pekab40') {
       return 'bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
-    if (s === 'to call again' || s === 'whatsapp sent') {
+    if (s === 'contacted' || s === 'to call again' || s === 'whatsapp sent') {
       return 'bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
+    }
+    if (s === 'unable to contact') {
+      return 'bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
     if (s === 'not contacted yet') {
       return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
@@ -1083,7 +1101,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       </div>
 
       {/* Quick stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {/* Total Records */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
@@ -1121,12 +1139,12 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           </div>
         </div>
 
-        {/* To Call Again */}
+        {/* Contacted */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-widest block font-sans">To Call Again</span>
+            <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-widest block font-sans">Contacted</span>
             <span className="text-3xl font-black text-indigo-600 block mt-1 font-sans">
-              {statsBaseList.filter(p => p.remarks === 'to call again').length}
+              {statsBaseList.filter(p => p.remarks === 'contacted' || p.remarks === 'to call again').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center shrink-0">
@@ -1134,23 +1152,36 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           </div>
         </div>
 
-        {/* Closed / Refused */}
+        {/* Unable to Contact */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Closed / Refused</span>
+            <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Unable to Contact</span>
             <span className="text-3xl font-black text-rose-600 block mt-1">
-              {statsBaseList.filter(p => p.remarks === 'refuse').length}
+              {statsBaseList.filter(p => p.remarks === 'unable to contact').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center shrink-0">
+            <Smartphone className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* Closed / Refused */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-widest block">Closed / Refused</span>
+            <span className="text-3xl font-black text-amber-600 block mt-1">
+              {statsBaseList.filter(p => p.remarks === 'refuse').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-amber-50 text-amber-700 rounded-xl flex items-center justify-center shrink-0">
             <AlertCircle className="w-6 h-6" />
           </div>
         </div>
 
-        {/* Done */}
+        {/* Done PeKa B40 */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-extrabold text-teal-700 uppercase tracking-widest block">Done</span>
+            <span className="text-[10px] font-extrabold text-teal-700 uppercase tracking-widest block">Done PeKa B40</span>
             <span className="text-3xl font-black text-teal-600 block mt-1">
               {statsBaseList.filter(p => p.remarks === 'done pekab40').length}
             </span>
@@ -2201,9 +2232,9 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                   }}
                   className="w-full px-3 py-2 bg-slate-55/60 border border-slate-200 text-xs font-semibold rounded-xl focus:bg-white focus:border-emerald-600 outline-none"
                 >
-                  <option value="not_contacted">General Invitiation (Belum dihubungi)</option>
+                  <option value="not_contacted">General Invitation (Belum dihubungi)</option>
                   <option value="appt_given">Appointment Confirmation (Appt Given)</option>
-                  <option value="follow_up">Follow up (Call Again / Not Answered)</option>
+                  <option value="follow_up">Follow up (Contacted / Unable to contact)</option>
                 </select>
               </div>
 
@@ -2292,7 +2323,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
               </div>
 
               <div>
-                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">Follow up / To Call Again</label>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">Follow up / Contacted</label>
                 <textarea
                   rows={5}
                   value={customTemplates.follow_up}
