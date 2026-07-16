@@ -12,6 +12,7 @@ import {
   Smartphone, 
   ChevronLeft, 
   ChevronRight,
+  CalendarX,
   Mail,
   Clock,
   FileEdit,
@@ -314,11 +315,11 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   };
 
   const handleOpenWhatsApp = (p: PeKaPatient) => {
-    const statusVal = String(p.remarks || '').trim().toLowerCase();
+    const statusVal = getPatientRemarksStatus(p);
     let defaultTmpl: keyof WhatsAppTemplates = 'not_contacted';
     
     if (statusVal === 'appt given') defaultTmpl = 'appt_given';
-    else if (statusVal === 'contacted' || statusVal === 'to call again') defaultTmpl = 'follow_up';
+    else if (statusVal === 'contacted' || statusVal === 'to call again' || statusVal === 'missed appointment' || statusVal === 'unable to contact') defaultTmpl = 'follow_up';
     
     setWhatsappSelectedTemplate(defaultTmpl);
     setWhatsappMessage(compileMessage(customTemplates[defaultTmpl], p));
@@ -386,6 +387,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     'contacted',
     'unable to contact',
     'appt given',
+    'missed appointment',
     'not contacted yet',
     'done pekab40'
   ];
@@ -419,6 +421,14 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       return 'unable to contact';
     }
     if (
+      clean === 'missed appointment' ||
+      clean.includes('missed') ||
+      clean.includes('lepas tarikh') ||
+      clean.includes('terlepas')
+    ) {
+      return 'missed appointment';
+    }
+    if (
       clean === 'contacted' ||
       clean === 'to call again' || 
       clean.includes('call again') || 
@@ -450,6 +460,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     if (o === 'contacted') return 'Contacted';
     if (o === 'to call again') return 'Contacted';
     if (o === 'unable to contact') return 'Unable to contact';
+    if (o === 'missed appointment') return 'Missed Appointment';
     if (o === 'not contacted yet') return 'Not Contacted Yet';
     if (o === 'refuse') return 'Closed / Refused';
     return o.replace(/\b\w/g, c => c.toUpperCase());
@@ -915,6 +926,45 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     document.body.removeChild(link);
   };
 
+  const todayStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  }, []);
+
+  const parseDDMMYYYY = (dateStr: string | null | undefined): number => {
+    if (!dateStr || typeof dateStr !== 'string') return 0;
+    const clean = dateStr.trim();
+    const separator = clean.includes('/') ? '/' : '-';
+    const parts = clean.split(separator);
+    if (parts.length !== 3) return 0;
+    
+    let d = 0, m = 0, y = 0;
+    if (parts[0].length === 4) {
+      // Format YYYY-MM-DD atau YYYY/MM/DD
+      y = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10) - 1;
+      d = parseInt(parts[2], 10);
+    } else {
+      // Format DD-MM-YYYY atau DD/MM/YYYY
+      d = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10) - 1;
+      y = parseInt(parts[2], 10);
+    }
+    
+    return new Date(y, m, d).getTime();
+  };
+
+  const getPatientRemarksStatus = (p: any): string => {
+    const rawRemarks = String(p.remarks || 'not contacted yet').trim().toLowerCase();
+    if (rawRemarks === 'appt given') {
+      const apptTimestamp = parseDDMMYYYY(p.appointmentDate);
+      if (apptTimestamp > 0 && apptTimestamp < todayStart) {
+        return 'missed appointment';
+      }
+    }
+    return rawRemarks;
+  };
+
   const statsBaseList = patients.filter(p => {
     const nameStr = String(p.name || '').toLowerCase();
     const icStr = String(p.ic || '');
@@ -948,7 +998,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       patientIdStr.includes(searchLower);
       
     const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
-    const matchesRemarks = remarksFilter === 'All' || p.remarks === remarksFilter;
+    const matchesRemarks = remarksFilter === 'All' || getPatientRemarksStatus(p) === remarksFilter;
     const matchesPostcode = postcodeFilter === 'All' || String(p.postalCode || '').trim() === postcodeFilter;
     
     return matchesSearch && matchesBranch && matchesRemarks && matchesPostcode;
@@ -967,34 +1017,6 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
   ).sort();
 
   const nearestAppointments = useMemo(() => {
-    // 1. Dapatkan tarikh hari ini (set jam ke 00:00:00 untuk perbandingan adil)
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    
-    // Fungsi bantuan untuk tukar teks tarikh menjadi angka Timestamp waktu (ms)
-    const parseDDMMYYYY = (dateStr: string | null | undefined) => {
-      if (!dateStr || typeof dateStr !== 'string') return 0;
-      const clean = dateStr.trim();
-      const separator = clean.includes('/') ? '/' : '-';
-      const parts = clean.split(separator);
-      if (parts.length !== 3) return 0;
-      
-      let d = 0, m = 0, y = 0;
-      if (parts[0].length === 4) {
-        // Format YYYY-MM-DD atau YYYY/MM/DD
-        y = parseInt(parts[0], 10);
-        m = parseInt(parts[1], 10) - 1;
-        d = parseInt(parts[2], 10);
-      } else {
-        // Format DD-MM-YYYY atau DD/MM/YYYY
-        d = parseInt(parts[0], 10);
-        m = parseInt(parts[1], 10) - 1;
-        y = parseInt(parts[2], 10);
-      }
-      
-      return new Date(y, m, d).getTime();
-    };
-
     return patients
       .filter(p => {
         const matchesBranch = branchFilter === 'All' || p.branch === branchFilter;
@@ -1018,7 +1040,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         return a.apptTimestamp - b.apptTimestamp;
       })
       .slice(0, 4);
-  }, [patients, branchFilter, postcodeFilter]);
+  }, [patients, branchFilter, postcodeFilter, todayStart]);
 
   const getStatusBadgeClass = (status: string) => {
     const s = String(status || '').trim().toLowerCase();
@@ -1033,6 +1055,9 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     }
     if (s === 'unable to contact') {
       return 'bg-rose-50 text-rose-700 border border-rose-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
+    }
+    if (s === 'missed appointment') {
+      return 'bg-orange-50 text-orange-700 border border-orange-200 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
     if (s === 'not contacted yet') {
       return 'bg-slate-50 text-slate-600 border border-slate-200 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
@@ -1101,7 +1126,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       </div>
 
       {/* Quick stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {/* Total Records */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
@@ -1118,7 +1143,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Not Contacted Yet</span>
             <span className="text-3xl font-black text-slate-700 block mt-1">
-              {statsBaseList.filter(p => p.remarks === 'not contacted yet').length}
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'not contacted yet').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-slate-50 text-slate-650 border border-slate-100 rounded-xl flex items-center justify-center shrink-0">
@@ -1131,11 +1156,24 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-widest block">Appointments Set</span>
             <span className="text-3xl font-black text-emerald-600 block mt-1">
-              {statsBaseList.filter(p => p.remarks === 'appt given').length}
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'appt given').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center shrink-0">
             <Calendar className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* Missed Appointment */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-orange-750 uppercase tracking-widest block font-sans">Missed Appointment</span>
+            <span className="text-3xl font-black text-orange-600 block mt-1 font-sans">
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'missed appointment').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
+            <CalendarX className="w-6 h-6" />
           </div>
         </div>
 
@@ -1144,7 +1182,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-widest block font-sans">Contacted</span>
             <span className="text-3xl font-black text-indigo-600 block mt-1 font-sans">
-              {statsBaseList.filter(p => p.remarks === 'contacted' || p.remarks === 'to call again').length}
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'contacted' || getPatientRemarksStatus(p) === 'to call again').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center shrink-0">
@@ -1157,7 +1195,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Unable to Contact</span>
             <span className="text-3xl font-black text-rose-600 block mt-1">
-              {statsBaseList.filter(p => p.remarks === 'unable to contact').length}
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'unable to contact').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center shrink-0">
@@ -1170,7 +1208,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-widest block">Closed / Refused</span>
             <span className="text-3xl font-black text-amber-600 block mt-1">
-              {statsBaseList.filter(p => p.remarks === 'refuse').length}
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'refuse').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-amber-50 text-amber-700 rounded-xl flex items-center justify-center shrink-0">
@@ -1183,7 +1221,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           <div>
             <span className="text-[10px] font-extrabold text-teal-700 uppercase tracking-widest block">Done PeKa B40</span>
             <span className="text-3xl font-black text-teal-600 block mt-1">
-              {statsBaseList.filter(p => p.remarks === 'done pekab40').length}
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'done pekab40').length}
             </span>
           </div>
           <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-xl flex items-center justify-center shrink-0">
@@ -1425,10 +1463,10 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                     </td>
                     <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0">
                       <select
-                        value={String(p.remarks || 'not contacted yet').trim().toLowerCase()}
+                        value={getPatientRemarksStatus(p)}
                         onChange={(e) => handleUpdateRemarks(p.id, e.target.value)}
                         className={cn(
-                          getStatusBadgeClass(p.remarks || 'not contacted yet'),
+                          getStatusBadgeClass(getPatientRemarksStatus(p)),
                           "w-full min-w-0 overflow-hidden text-ellipsis cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-600 appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-[right_8px_center] bg-no-repeat transition-all font-bold tracking-tight text-[10px] sm:text-[11px]"
                         )}
                       >
