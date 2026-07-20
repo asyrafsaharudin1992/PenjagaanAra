@@ -33,11 +33,12 @@ interface CaseListProps {
   setTagFilter: (tag: string | null) => void;
 }
 
-const STATUS_OPTIONS = ['Active', 'Responded', 'No Response', 'Defaulter'];
+const STATUS_OPTIONS = ['Active', 'Responded', 'No Response', 'To contact later', 'Defaulter'];
 const STATUS_COLORS: Record<string, string> = {
   'Active': 'bg-[#E6F4EA] text-[#137333]',
   'Responded': 'bg-[#E8F0FE] text-[#1A73E8]',
   'No Response': 'bg-[#FEF7E0] text-[#B06000]',
+  'To contact later': 'bg-[#F3E8FF] text-[#6B21A8]',
   'Defaulter': 'bg-[#FCE8E6] text-[#C5221F]',
 };
 
@@ -466,7 +467,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
       if (p.diagnosis) {
         reportText += `   - Diagnosis during referral: ${p.diagnosis}\n`;
       }
-      reportText += `   - Follow-up remarks: ${p.remarks}\n\n`;
+      reportText += `   - Follow up remarks: ${p.remarks}\n\n`;
     });
     
     return reportText.trim();
