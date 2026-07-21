@@ -89,6 +89,7 @@ export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<FollowUpCase[]>([]);
+  const [caseLimit, setCaseLimit] = useState<number | null>(500);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showCSVImport, setShowCSVImport] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
@@ -244,19 +245,31 @@ export default function App() {
 
     let q;
     if (user.role === 'Superadmin') {
-      q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'), limit(500));
+      if (caseLimit !== null) {
+        q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'), limit(caseLimit));
+      } else {
+        q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'));
+      }
     } else {
       if (!user.branch) {
         setCases([]);
         return;
       }
       
-      q = query(
-        collection(db, 'cases'), 
-        where('branch', '==', user.branch),
-        orderBy('createdAt', 'desc'),
-        limit(500)
-      );
+      if (caseLimit !== null) {
+        q = query(
+          collection(db, 'cases'), 
+          where('branch', '==', user.branch),
+          orderBy('createdAt', 'desc'),
+          limit(caseLimit)
+        );
+      } else {
+        q = query(
+          collection(db, 'cases'), 
+          where('branch', '==', user.branch),
+          orderBy('createdAt', 'desc')
+        );
+      }
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -274,7 +287,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user, dataReady]);
+  }, [user, dataReady, caseLimit]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -623,7 +636,7 @@ export default function App() {
 
             {activeTab === 'dashboard' && <Dashboard cases={cases} userName={user.displayName} onFilterByTag={(tag) => { setTagFilter(tag); setActiveTab('cases'); }} />}
             {activeTab === 'calendar' && <CalendarView user={user} />}
-            {activeTab === 'cases' && user && <CaseList cases={cases} onViewCase={setSelectedCaseId} currentUser={user} tagFilter={tagFilter} setTagFilter={setTagFilter} />}
+            {activeTab === 'cases' && user && <CaseList cases={cases} onViewCase={setSelectedCaseId} currentUser={user} tagFilter={tagFilter} setTagFilter={setTagFilter} caseLimit={caseLimit} setCaseLimit={setCaseLimit} />}
             {activeTab === 'todo' && <TodoList user={user} />}
             {activeTab === 'patients' && (
               <div className="space-y-6">
