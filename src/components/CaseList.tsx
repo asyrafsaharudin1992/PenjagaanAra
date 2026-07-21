@@ -31,6 +31,8 @@ interface CaseListProps {
   currentUser: UserProfile;
   tagFilter: string | null;
   setTagFilter: (tag: string | null) => void;
+  caseLimit: number | null;
+  setCaseLimit: (limit: number | null) => void;
 }
 
 const STATUS_OPTIONS = ['Active', 'Responded', 'No Response', 'To contact later', 'Defaulter'];
@@ -51,7 +53,7 @@ const defaultTemplates: Record<string, string> = {
   'All Branches|others': `Salam tuan/puan {{nama}},\n\nIni adalah mesej susulan dari Klinik ARA 24 Jam.`,
 };
 
-export default function CaseList({ cases, onViewCase, currentUser, tagFilter, setTagFilter }: CaseListProps) {
+export default function CaseList({ cases, onViewCase, currentUser, tagFilter, setTagFilter, caseLimit, setCaseLimit }: CaseListProps) {
   const userPermissions = currentUser.permissions || [];
   const userRole = currentUser.role;
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,6 +119,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
     isProcessing: false
   });
 
+  const [sortBy, setSortBy] = useState<'createdAt_desc' | 'nextFollowUpDate_desc' | 'nextFollowUpDate_asc' | 'appointmentDate_desc' | 'lastVisitDate_desc'>('createdAt_desc');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,7 +170,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
     setExportModal({
       isOpen: true,
       startPage: 1,
-      endPage: Math.ceil(filteredCases.length / itemsPerPage) || 1,
+      endPage: Math.ceil(sortedFilteredCases.length / itemsPerPage) || 1,
       isExporting: false
     });
   };
@@ -177,7 +180,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
     try {
       const startIndex = (exportModal.startPage - 1) * itemsPerPage;
       const endIndex = exportModal.endPage * itemsPerPage;
-      const casesToExport = filteredCases.slice(Math.max(0, startIndex), Math.min(filteredCases.length, endIndex));
+      const casesToExport = sortedFilteredCases.slice(Math.max(0, startIndex), Math.min(sortedFilteredCases.length, endIndex));
 
       const csvData = [];
       const total = casesToExport.length;
@@ -362,16 +365,38 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
     return matchesSearch && matchesStatus && matchesBranch && matchesPatientStatus && matchesDate;
   });
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredCases.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedCases = filteredCases.slice(startIndex, startIndex + itemsPerPage);
+  // Sort logic based on selected sortBy option
+  const sortedFilteredCases = useMemo(() => {
+    return [...filteredCases].sort((a, b) => {
+      if (sortBy === 'createdAt_desc') {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+      if (sortBy === 'nextFollowUpDate_desc') {
+        return new Date(b.nextFollowUpDate || 0).getTime() - new Date(a.nextFollowUpDate || 0).getTime();
+      }
+      if (sortBy === 'nextFollowUpDate_asc') {
+        return new Date(a.nextFollowUpDate || 0).getTime() - new Date(b.nextFollowUpDate || 0).getTime();
+      }
+      if (sortBy === 'appointmentDate_desc') {
+        return new Date(b.appointmentDate || 0).getTime() - new Date(a.appointmentDate || 0).getTime();
+      }
+      if (sortBy === 'lastVisitDate_desc') {
+        return new Date(b.lastVisitDate || 0).getTime() - new Date(a.lastVisitDate || 0).getTime();
+      }
+      return 0;
+    });
+  }, [filteredCases, sortBy]);
 
-  // Reset to page 1 when filters change
+  // Pagination logic
+  const totalPages = Math.ceil(sortedFilteredCases.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedCases = sortedFilteredCases.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset to page 1 when filters or sort change
   React.useEffect(() => {
     setCurrentPage(1);
     if (statusFilter === 'All') setTagFilter(null);
-  }, [searchTerm, statusFilter, startDate, endDate]);
+  }, [searchTerm, statusFilter, startDate, endDate, sortBy]);
 
   const patientHistory = historyPatientId 
     ? cases.filter(c => c.patientId === historyPatientId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -582,6 +607,17 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
+          <select 
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+          >
+            <option value="createdAt_desc">Sort: Newest Key-in</option>
+            <option value="nextFollowUpDate_desc">Sort: Newest Follow-up</option>
+            <option value="nextFollowUpDate_asc">Sort: Upcoming Follow-up</option>
+            <option value="appointmentDate_desc">Sort: Newest Appt Date</option>
+            <option value="lastVisitDate_desc">Sort: Newest Last Visit</option>
+          </select>
           {userRole === 'Superadmin' && (
             <select 
               value={branchFilter}
@@ -627,6 +663,48 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
             TEMPLATES
           </button>
         </div>
+
+      {caseLimit ? (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl shrink-0 mt-0.5">
+              <Info className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-slate-900 text-sm">Viewing Window: Last 500 cases</h4>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Only the 500 most recent cases are loaded by default to maintain lightning-fast performance.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setCaseLimit(null)}
+            className="self-start sm:self-center px-4 py-2 bg-indigo-950 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-indigo-900 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-sm"
+          >
+            Load All Cases
+          </button>
+        </div>
+      ) : (
+        <div className="bg-emerald-50/50 border border-emerald-200/50 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl shrink-0 mt-0.5">
+              <Check className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-emerald-900 text-sm">Full Database Loaded</h4>
+              <p className="text-xs text-emerald-600 mt-0.5">
+                All historical processed cases are loaded. CSV exports will contain the entire lifetime database.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setCaseLimit(500)}
+            className="self-start sm:self-center px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95 whitespace-nowrap shrink-0"
+          >
+            Restore 500 Limit
+          </button>
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="w-full">
