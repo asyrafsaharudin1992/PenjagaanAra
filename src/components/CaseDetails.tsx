@@ -113,6 +113,7 @@ export default function CaseDetails({
   const [editedAppointmentDate, setEditedAppointmentDate] = useState(caseData.appointmentDate || '');
   const [editedLastVisitDate, setEditedLastVisitDate] = useState(caseData.lastVisitDate || '');
   const [editedKeyInDate, setEditedKeyInDate] = useState(caseData.createdAt ? caseData.createdAt.split('T')[0] : '');
+  const [editedPatientPhone, setEditedPatientPhone] = useState(caseData.patientPhone || '');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // Reset states when caseId changes (handles cases where component stays mounted)
@@ -126,7 +127,8 @@ export default function CaseDetails({
     setEditedAppointmentDate(caseData.appointmentDate || '');
     setEditedLastVisitDate(caseData.lastVisitDate || '');
     setEditedKeyInDate(caseData.createdAt ? caseData.createdAt.split('T')[0] : '');
-  }, [caseData.id, caseData.createdAt]);
+    setEditedPatientPhone(caseData.patientPhone || '');
+  }, [caseData.id, caseData.createdAt, caseData.patientPhone]);
 
   // --- ADDED: ANC and NCD field state ---
   const [ancFields, setAncFields] = useState<ANCFields>(defaultANCFields);
@@ -340,7 +342,8 @@ export default function CaseDetails({
         followUpDoneBy: editedFollowUpDoneBy,
         appointmentDate: editedAppointmentDate,
         lastVisitDate: editedLastVisitDate,
-        createdAt: newCreatedAt
+        createdAt: newCreatedAt,
+        patientPhone: editedPatientPhone
       };
 
       if (editedRemarks !== caseData.remarks) {
@@ -357,6 +360,15 @@ export default function CaseDetails({
         (updates as any).registryData = null;
       }
       // --- END ADDED ---
+
+      // Update patients collection if patientId exists
+      if (caseData.patientId && editedPatientPhone !== caseData.patientPhone) {
+        try {
+          await setDoc(doc(db, 'patients', caseData.patientId), { phone: editedPatientPhone }, { merge: true });
+        } catch (err) {
+          console.error("Failed to update patient phone in patients collection:", err);
+        }
+      }
 
       await onUpdate(caseData.id, updates);
       onClose();
@@ -436,10 +448,10 @@ export default function CaseDetails({
             <div>
               <h3 className="font-bold text-slate-900">{caseData.patientName}</h3>
               <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-500">{caseData.patientPhone || 'No phone recorded'} • ID: {caseData.patientId}</p>
-                {caseData.patientPhone && (
+                <p className="text-xs text-slate-500">{editedPatientPhone || 'No phone recorded'} • ID: {caseData.patientId}</p>
+                {editedPatientPhone && (
                   <a 
-                    href={formatWhatsAppLink(caseData.patientPhone) || '#'} 
+                    href={formatWhatsAppLink(editedPatientPhone) || '#'} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-emerald-600 hover:text-emerald-700 transition-colors"
@@ -555,7 +567,17 @@ export default function CaseDetails({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/60">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-200/60">
+              <div>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Phone Number</p>
+                <input 
+                  type="text"
+                  value={editedPatientPhone}
+                  onChange={(e) => setEditedPatientPhone(e.target.value)}
+                  className="w-full text-sm font-medium text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  placeholder="Phone Number"
+                />
+              </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Doctor In Charge</p>
                 <input 
