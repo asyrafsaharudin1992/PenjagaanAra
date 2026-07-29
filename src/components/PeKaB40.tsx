@@ -258,12 +258,14 @@ interface WhatsAppTemplates {
   appt_given: string;
   not_contacted: string;
   follow_up: string;
+  missed_appointment: string;
 }
 
 const defaultTemplates: WhatsAppTemplates = {
   appt_given: `Salam Tuan/Puan {{nama}},\nSaya dari Klinik ARA 24 Jam ingin memaklumkan bahawa tarikh temu janji saringan kesihatan percuma PeKa B40 Tuan/Puan adalah seperti berikut:\n\n📅 Tarikh: {{tarikh}}\n⏰ Masa: {{masa}}\n🏥 Lokasi: {{lokasi}}\n\nBoleh hadir tepat pada masa yang ditetapkan dan bawa bersama dokumen pengenalan diri untuk tujuan pengesahan.\nSekiranya ada sebarang pertanyaan atau keperluan untuk menukar tarikh, boleh maklumkan kepada pihak klinik.\n\nTerima kasih,\nKlinik ARA 24 Jam`,
   not_contacted: `Salam Tuan/Puan {{nama}},\n\nTuan/Puan layak untuk menjalani saringan kesihatan percuma di bawah program PeKa B40 di Klinik ARA 24 Jam. Antara ujian yang akan dijalankan termasuklah ujian sel darah, ujian kawalan gula darah, ujian paras kolesterol, ujian fungsi buah pinggang dan ujian air kencing.\n\nSekiranya berminat untuk membuat temu janji, boleh hubungi kami semula.\n\nTerima kasih,\nKlinik ARA 24 Jam`,
-  follow_up: `Salam Tuan/Puan {{nama}},\n\nIni adalah peringatan mesra dari Klinik ARA 24 Jam. Kami masih menunggu maklum balas dari pihak Tuan/Puan berkenaan saringan kesihatan PeKa B40 secara percuma.\n\nSila hubungi kami jika berminat.`
+  follow_up: `Salam Tuan/Puan {{nama}},\n\nIni adalah peringatan mesra dari Klinik ARA 24 Jam. Kami masih menunggu maklum balas dari pihak Tuan/Puan berkenaan saringan kesihatan PeKa B40 secara percuma.\n\nSila hubungi kami jika berminat.`,
+  missed_appointment: `Salam Tuan/Puan {{nama}},\n\nKami dapati Tuan/Puan telah terlepas tarikh temu janji saringan kesihatan PeKa B40 di Klinik ARA 24 Jam pada {{tarikh}}.\n\nSekiranya Tuan/Puan masih berminat, sila maklumkan kepada kami untuk penjadualan semula tarikh temu janji baru.\n\nTerima kasih,\nKlinik ARA 24 Jam`
 };
 
 export default function PeKaB40({ currentUser }: PeKaB40Props) {
@@ -318,8 +320,9 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     const statusVal = getPatientRemarksStatus(p);
     let defaultTmpl: keyof WhatsAppTemplates = 'not_contacted';
     
-    if (statusVal === 'appt given') defaultTmpl = 'appt_given';
-    else if (statusVal === 'contacted' || statusVal === 'to call again' || statusVal === 'missed appointment' || statusVal === 'unable to contact') defaultTmpl = 'follow_up';
+    if (statusVal === 'missed appointment') defaultTmpl = 'missed_appointment';
+    else if (statusVal === 'appt given') defaultTmpl = 'appt_given';
+    else if (statusVal === 'contacted' || statusVal === 'to call again' || statusVal === 'unable to contact') defaultTmpl = 'follow_up';
     
     setWhatsappSelectedTemplate(defaultTmpl);
     setWhatsappMessage(compileMessage(customTemplates[defaultTmpl], p));
@@ -2273,6 +2276,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                   <option value="not_contacted">General Invitation (Belum dihubungi)</option>
                   <option value="appt_given">Appointment Confirmation (Appt Given)</option>
                   <option value="follow_up">Follow up (Contacted / Unable to contact)</option>
+                  <option value="missed_appointment">Missed Appointment (Terlepas Temu Janji)</option>
                 </select>
               </div>
 
@@ -2366,6 +2370,16 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                   rows={5}
                   value={customTemplates.follow_up}
                   onChange={(e) => setCustomTemplates({...customTemplates, follow_up: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50/50 hover:bg-slate-50 border border-slate-200 text-xs font-medium rounded-xl focus:bg-white focus:border-emerald-600 outline-none resize-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">Missed Appointment (Terlepas Temu Janji)</label>
+                <textarea
+                  rows={6}
+                  value={customTemplates.missed_appointment}
+                  onChange={(e) => setCustomTemplates({...customTemplates, missed_appointment: e.target.value})}
                   className="w-full px-4 py-3 bg-slate-50/50 hover:bg-slate-50 border border-slate-200 text-xs font-medium rounded-xl focus:bg-white focus:border-emerald-600 outline-none resize-none transition-all"
                 />
               </div>
