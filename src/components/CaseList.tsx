@@ -49,7 +49,8 @@ const defaultTemplates: Record<string, string> = {
   'All Branches|referral': `Salam tuan/puan, saya daripada Klinik ARA 24 Jam, terima kasih kerana mendapatkan perkhidmatan di klinik kami.\n\nBoleh saya tahu keadaan {{nama}} setelah dirujuk ke hospital tempoh hari?`,
   'All Branches|aramommy': `Salam puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam berkenaan temu janji ARAMOMMY.`,
   'All Branches|arachronic': `Salam tuan/puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam untuk pemeriksaan penyakit kronik.`,
-  'All Branches|arasihat': `Salam tuan/puan {{nama}},\n\nIni adalah peringatan dari Klinik ARA 24 Jam berkenaan pemeriksaan saringan kesihatan AraSihat anda.`,
+  'All Branches|arasihat': `Salam tuan/puan {{nama}},\n\nIni meupakan peringatan dari Klinik ARA 24 Jam berkenaan pemeriksaan saringan kesihatan AraSihat anda.`,
+  'All Branches|missed_appointment': `Salam Tuan/Puan {{nama}},\n\nKami dapati Tuan/Puan telah terlepas temu janji di Klinik ARA 24 Jam.\n\nSekiranya Tuan/Puan berhasrat untuk menjadualkan semula tarikh temu janji, sila maklumkan kepada pihak kami.\n\nTerima kasih,\nKlinik ARA 24 Jam`,
   'All Branches|others': `Salam tuan/puan {{nama}},\n\nIni adalah mesej susulan dari Klinik ARA 24 Jam.`,
 };
 
@@ -1589,6 +1590,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
                     <option value="aramommy">ARAMOMMY</option>
                     <option value="arachronic">ARACHRONIC</option>
                     <option value="arasihat">ARASIHAT</option>
+                    <option value="missed_appointment">MISSED APPOINTMENT</option>
                     <option value="others">OTHERS</option>
                   </select>
                 </div>
