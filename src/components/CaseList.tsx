@@ -85,6 +85,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
   // States for "Update Doctor" tab
   const [activeTab, setActiveTab] = useState<'all' | 'update_doctor'>('all');
   const [selectedDoctor, setSelectedDoctor] = useState<string>('');
+  const [doctorDateType, setDoctorDateType] = useState<'lastVisitDate' | 'createdAt'>('lastVisitDate');
   const [doctorStartDate, setDoctorStartDate] = useState<string>('');
   const [doctorEndDate, setDoctorEndDate] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
@@ -449,34 +450,37 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
         return false;
       }
       
-      // Filter by last visit date
-      if (!c.lastVisitDate) return false;
+      const targetDate = doctorDateType === 'lastVisitDate' ? c.lastVisitDate : c.createdAt;
+      if (!targetDate) return false;
       
-      const visitDateObj = new Date(c.lastVisitDate);
-      if (isNaN(visitDateObj.getTime())) return false;
-      visitDateObj.setHours(0, 0, 0, 0);
+      const dateObj = new Date(targetDate);
+      if (isNaN(dateObj.getTime())) return false;
       
       if (doctorStartDate) {
         const start = new Date(doctorStartDate);
         start.setHours(0, 0, 0, 0);
-        if (visitDateObj < start) return false;
+        if (dateObj < start) return false;
       }
       
       if (doctorEndDate) {
         const end = new Date(doctorEndDate);
-        end.setHours(0, 0, 0, 0);
-        if (visitDateObj > end) return false;
+        end.setHours(23, 59, 59, 999);
+        if (dateObj > end) return false;
       }
       
       return true;
-    }).sort((a, b) => new Date(b.lastVisitDate || b.createdAt).getTime() - new Date(a.lastVisitDate || a.createdAt).getTime());
-  }, [cases, selectedDoctor, doctorStartDate, doctorEndDate]);
+    }).sort((a, b) => {
+      const timeA = new Date(doctorDateType === 'lastVisitDate' ? (a.lastVisitDate || a.createdAt) : a.createdAt).getTime();
+      const timeB = new Date(doctorDateType === 'lastVisitDate' ? (b.lastVisitDate || b.createdAt) : b.createdAt).getTime();
+      return timeB - timeA;
+    });
+  }, [cases, selectedDoctor, doctorDateType, doctorStartDate, doctorEndDate]);
 
   const generatedReportText = useMemo(() => {
     if (!selectedDoctor || doctorPatients.length === 0) return '';
     
     let reportText = `*PATIENT UPDATES FOR DR. ${selectedDoctor.toUpperCase()}*\n`;
-    if (doctorStartDate || doctorEndDate) {
+    if ((doctorStartDate || doctorEndDate) && doctorDateType === 'lastVisitDate') {
       const startStr = doctorStartDate ? new Date(doctorStartDate).toLocaleDateString('en-GB') : 'Start';
       const endStr = doctorEndDate ? new Date(doctorEndDate).toLocaleDateString('en-GB') : 'End';
       reportText += `Period (Last Visit): ${startStr} to ${endStr}\n`;
@@ -497,7 +501,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
     });
     
     return reportText.trim();
-  }, [doctorPatients, selectedDoctor, doctorStartDate, doctorEndDate]);
+  }, [doctorPatients, selectedDoctor, doctorDateType, doctorStartDate, doctorEndDate]);
 
   const copyReportToClipboard = () => {
     const reportText = generatedReportText;
@@ -1114,7 +1118,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-bold text-slate-900 tracking-tight">Generate Doctor Patient Updates</h3>
-            <p className="text-slate-500 text-xs mt-0.5">Filter patients with follow-up remarks by doctor and last visit date range.</p>
+            <p className="text-slate-500 text-xs mt-0.5">Filter patients with follow-up remarks by doctor and selected date filter range.</p>
           </div>
           
           {doctorPatients.length > 0 && (
@@ -1133,7 +1137,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Select Doctor</label>
             <select
@@ -1149,7 +1153,21 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Start Date (Last Visit)</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Date By</label>
+            <select
+              value={doctorDateType}
+              onChange={(e) => setDoctorDateType(e.target.value as 'lastVisitDate' | 'createdAt')}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+            >
+              <option value="lastVisitDate">Last Visit Date</option>
+              <option value="createdAt">Date of Key In</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Start Date ({doctorDateType === 'lastVisitDate' ? 'Last Visit' : 'Key In'})
+            </label>
             <input
               type="date"
               value={doctorStartDate}
@@ -1159,7 +1177,9 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">End Date (Last Visit)</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              End Date ({doctorDateType === 'lastVisitDate' ? 'Last Visit' : 'Key In'})
+            </label>
             <input
               type="date"
               value={doctorEndDate}
@@ -1232,7 +1252,7 @@ export default function CaseList({ cases, onViewCase, currentUser, tagFilter, se
           <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <h4 className="text-sm font-bold text-slate-700">No Patient Updates Found</h4>
           <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            There are no patients assigned to <strong className="text-slate-700">{selectedDoctor}</strong> who have last visit dates matching this period with follow-up remarks.
+            There are no patients assigned to <strong className="text-slate-700">{selectedDoctor}</strong> who match this date period ({doctorDateType === 'lastVisitDate' ? 'Last Visit Date' : 'Date of Key In'}) with follow-up remarks.
           </p>
         </div>
       ) : (
