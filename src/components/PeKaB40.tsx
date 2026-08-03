@@ -957,6 +957,44 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     return new Date(y, m, d).getTime();
   };
 
+  const isPastDueAppt = (p: any): boolean => {
+    const rawRemarks = String(p.remarks || 'not contacted yet').trim().toLowerCase();
+    if (rawRemarks === 'appt given' || rawRemarks === 'appt date given') {
+      const apptTimestamp = parseDDMMYYYY(p.appointmentDate);
+      return apptTimestamp > 0 && apptTimestamp < todayStart;
+    }
+    return false;
+  };
+
+  const pastDueApptPatients = useMemo(() => {
+    return patients.filter(isPastDueAppt);
+  }, [patients, todayStart]);
+
+  const handleBatchMarkAsMissed = async () => {
+    if (pastDueApptPatients.length === 0) return;
+    const isConfirmed = window.confirm(`Adakah anda pasti untuk menandakan ${pastDueApptPatients.length} pesakit ini sebagai "Missed Appointment"?`);
+    if (!isConfirmed) return;
+
+    try {
+      const batch = writeBatch(db);
+      pastDueApptPatients.forEach(p => {
+        const ref = doc(db, 'peka_b40_patients', p.id);
+        batch.update(ref, { remarks: 'missed appointment' });
+      });
+      await batch.commit();
+      setPatients(prev => prev.map(p => {
+        if (pastDueApptPatients.some(pd => pd.id === p.id)) {
+          return { ...p, remarks: 'missed appointment' };
+        }
+        return p;
+      }));
+      toast.success(`Berjaya menandakan ${pastDueApptPatients.length} pesakit sebagai Missed Appointment.`);
+    } catch (err: any) {
+      console.error("Batch update failed:", err);
+      toast.error("Gagal mengemaskini rekod: " + err.message);
+    }
+  };
+
   const getPatientRemarksStatus = (p: any): string => {
     const rawRemarks = String(p.remarks || 'not contacted yet').trim().toLowerCase();
     if (rawRemarks === 'appt given') {
@@ -1233,6 +1271,108 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         </div>
       </div>
 
+      {/* Past Appointment Verification Banner (Semakan Temu Janji Semalam / Lepas) */}
+      {pastDueApptPatients.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-amber-50/90 to-orange-50 border border-amber-200 rounded-3xl p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/70 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-100/80 text-amber-900 rounded-2xl shrink-0 border border-amber-200">
+                <AlertCircle className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-amber-950 flex items-center gap-2">
+                  Semakan Temu Janji Lepas
+                  <span className="bg-amber-200/80 text-amber-900 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-amber-300">
+                    {pastDueApptPatients.length} Pesakit Perlu Pengesahan
+                  </span>
+                </h3>
+                <p className="text-xs text-amber-800/90 mt-0.5 font-medium">
+                  Tarikh temu janji bagi pesakit ini telah melepasi tarikh asal (cth: semalam). Sila sahkan sama ada pesakit telah hadir (Done PeKa B40) atau belum/terlepas (Missed Appointment).
+                </p>
+              </div>
+            </div>
+
+            {pastDueApptPatients.length > 1 && (
+              <button
+                onClick={handleBatchMarkAsMissed}
+                className="self-start sm:self-center px-3.5 py-2 bg-amber-200/70 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-xl border border-amber-300/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs flex items-center gap-1.5"
+              >
+                <CalendarX className="w-3.5 h-3.5" />
+                Sahkan Semua Missed ({pastDueApptPatients.length})
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
+            {pastDueApptPatients.map((p) => {
+              let displayDate = p.appointmentDate || '-';
+              if (displayDate.includes('-')) {
+                const parts = displayDate.split('-');
+                if (parts.length === 3 && parts[0].length === 4) {
+                  displayDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+              }
+              return (
+                <div key={p.id} className="bg-white border border-amber-200/80 rounded-2xl p-3.5 flex flex-col justify-between gap-3 shadow-2xs hover:border-amber-300 transition-all">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider block truncate">
+                        {p.branch} • {displayDate} {p.time ? `(${p.time})` : ''}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900 mt-0.5 truncate" title={p.name}>{p.name}</h4>
+                      <p className="text-[11px] text-slate-500 font-medium truncate">{p.ic || 'No IC'} • {p.phone || '-'}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/60 flex flex-col gap-2">
+                    <span className="text-[11px] text-amber-950 font-extrabold text-center">Dah done PeKa B40 tak?</span>
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => handleUpdateRemarks(p.id, 'done pekab40')}
+                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition-all active:scale-95 flex items-center gap-1 cursor-pointer shadow-2xs"
+                        title="Sahkan Pesakit Selesai PeKa B40"
+                      >
+                        <Check className="w-3 h-3" />
+                        Ya (Dah Done)
+                      </button>
+                      <button
+                        onClick={() => handleUpdateRemarks(p.id, 'missed appointment')}
+                        className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-[10px] rounded-lg transition-all active:scale-95 flex items-center gap-1 cursor-pointer shadow-2xs"
+                        title="Sahkan Pesakit Tidak Hadir"
+                      >
+                        <X className="w-3 h-3" />
+                        Tidak (Missed)
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPatient(p);
+                          setFormName(p.name);
+                          setFormIC(p.ic);
+                          setFormPhone(p.phone);
+                          setFormAddress(p.address);
+                          setFormPostalCode(p.postalCode);
+                          setFormApptDate(p.appointmentDate);
+                          setFormRemarks(p.remarks);
+                          setFormTime(p.time);
+                          setFormNotes(p.additionalNotes);
+                          setFormBranch(p.branch);
+                          setFormCustomId(p.patientId);
+                          setIsEditModalOpen(true);
+                        }}
+                        className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] rounded-lg transition-all cursor-pointer"
+                        title="Tukar Tarikh Temu Janji Baru"
+                      >
+                        Tukar Tarikh
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Filters & Search */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
@@ -1484,6 +1624,24 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                           </option>
                         )}
                       </select>
+                      {isPastDueAppt(p) && (
+                        <div className="mt-1 flex items-center gap-1 flex-wrap">
+                          <button
+                            onClick={() => handleUpdateRemarks(p.id, 'done pekab40')}
+                            className="text-[9px] font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white px-1.5 py-0.5 rounded-md transition-all cursor-pointer shadow-2xs flex items-center gap-0.5"
+                            title="Sahkan Dah Done PeKa B40"
+                          >
+                            <Check className="w-2.5 h-2.5" /> Done
+                          </button>
+                          <button
+                            onClick={() => handleUpdateRemarks(p.id, 'missed appointment')}
+                            className="text-[9px] font-extrabold bg-orange-600 hover:bg-orange-700 text-white px-1.5 py-0.5 rounded-md transition-all cursor-pointer shadow-2xs flex items-center gap-0.5"
+                            title="Sahkan Missed Appointment"
+                          >
+                            <X className="w-2.5 h-2.5" /> Missed
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-2 2xl:px-3 py-2 2xl:py-3 min-w-0">
                       <InlineTimeCell
