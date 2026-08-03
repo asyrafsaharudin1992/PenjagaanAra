@@ -406,14 +406,12 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       return 'done pekab40';
     }
     if (
-      clean === 'appt given' || 
-      clean === 'appt date given' || 
-      clean.includes('appt') || 
-      clean.includes('appointment') || 
-      clean.includes('temujanji') || 
-      clean.includes('date given')
+      clean === 'missed appointment' ||
+      clean.includes('missed') ||
+      clean.includes('lepas tarikh') ||
+      clean.includes('terlepas')
     ) {
-      return 'appt given';
+      return 'missed appointment';
     }
     if (
       clean === 'unable to contact' ||
@@ -424,12 +422,14 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       return 'unable to contact';
     }
     if (
-      clean === 'missed appointment' ||
-      clean.includes('missed') ||
-      clean.includes('lepas tarikh') ||
-      clean.includes('terlepas')
+      clean === 'appt given' || 
+      clean === 'appt date given' || 
+      clean.includes('appt') || 
+      clean.includes('appointment') || 
+      clean.includes('temujanji') || 
+      clean.includes('date given')
     ) {
-      return 'missed appointment';
+      return 'appt given';
     }
     if (
       clean === 'contacted' ||
