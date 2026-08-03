@@ -972,7 +972,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
 
   const handleBatchMarkAsMissed = async () => {
     if (pastDueApptPatients.length === 0) return;
-    const isConfirmed = window.confirm(`Adakah anda pasti untuk menandakan ${pastDueApptPatients.length} pesakit ini sebagai "Missed Appointment"?`);
+    const isConfirmed = window.confirm(`Are you sure you want to mark these ${pastDueApptPatients.length} patients as "Missed Appointment"?`);
     if (!isConfirmed) return;
 
     try {
@@ -988,10 +988,10 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         }
         return p;
       }));
-      toast.success(`Berjaya menandakan ${pastDueApptPatients.length} pesakit sebagai Missed Appointment.`);
+      toast.success(`Successfully marked ${pastDueApptPatients.length} patients as Missed Appointment.`);
     } catch (err: any) {
       console.error("Batch update failed:", err);
-      toast.error("Gagal mengemaskini rekod: " + err.message);
+      toast.error("Failed to update records: " + err.message);
     }
   };
 
@@ -1271,7 +1271,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
         </div>
       </div>
 
-      {/* Past Appointment Verification Banner (Semakan Temu Janji Semalam / Lepas) */}
+      {/* Past Appointment Verification Banner */}
       {pastDueApptPatients.length > 0 && (
         <div className="bg-gradient-to-r from-amber-50 via-amber-50/90 to-orange-50 border border-amber-200 rounded-3xl p-5 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/70 pb-3">
@@ -1281,13 +1281,13 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
               </div>
               <div>
                 <h3 className="text-sm font-extrabold text-amber-950 flex items-center gap-2">
-                  Semakan Temu Janji Lepas
+                  Past Appointment Verification
                   <span className="bg-amber-200/80 text-amber-900 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-amber-300">
-                    {pastDueApptPatients.length} Pesakit Perlu Pengesahan
+                    {pastDueApptPatients.length} Patients Need Confirmation
                   </span>
                 </h3>
                 <p className="text-xs text-amber-800/90 mt-0.5 font-medium">
-                  Tarikh temu janji bagi pesakit ini telah melepasi tarikh asal (cth: semalam). Sila sahkan sama ada pesakit telah hadir (Done PeKa B40) atau belum/terlepas (Missed Appointment).
+                  This patient's appointment date has already passed (e.g. yesterday). Please confirm whether the patient attended the appointment (Done PeKa B40) or missed the appointment (Missed Appointment).
                 </p>
               </div>
             </div>
@@ -1298,7 +1298,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                 className="self-start sm:self-center px-3.5 py-2 bg-amber-200/70 hover:bg-amber-200 text-amber-900 text-xs font-bold rounded-xl border border-amber-300/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs flex items-center gap-1.5"
               >
                 <CalendarX className="w-3.5 h-3.5" />
-                Sahkan Semua Missed ({pastDueApptPatients.length})
+                Confirm All as Missed ({pastDueApptPatients.length})
               </button>
             )}
           </div>
@@ -1325,23 +1325,23 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                   </div>
 
                   <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/60 flex flex-col gap-2">
-                    <span className="text-[11px] text-amber-950 font-extrabold text-center">Dah done PeKa B40 tak?</span>
+                    <span className="text-[11px] text-amber-950 font-extrabold text-center">Did the patient complete PeKa B40?</span>
                     <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       <button
                         onClick={() => handleUpdateRemarks(p.id, 'done pekab40')}
                         className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg transition-all active:scale-95 flex items-center gap-1 cursor-pointer shadow-2xs"
-                        title="Sahkan Pesakit Selesai PeKa B40"
+                        title="Confirm Patient Completed PeKa B40"
                       >
                         <Check className="w-3 h-3" />
-                        Ya (Dah Done)
+                        Yes (Done)
                       </button>
                       <button
                         onClick={() => handleUpdateRemarks(p.id, 'missed appointment')}
                         className="px-2.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-[10px] rounded-lg transition-all active:scale-95 flex items-center gap-1 cursor-pointer shadow-2xs"
-                        title="Sahkan Pesakit Tidak Hadir"
+                        title="Confirm Patient Missed Appointment"
                       >
                         <X className="w-3 h-3" />
-                        Tidak (Missed)
+                        No (Missed)
                       </button>
                       <button
                         onClick={() => {
@@ -1360,9 +1360,9 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                           setIsEditModalOpen(true);
                         }}
                         className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] rounded-lg transition-all cursor-pointer"
-                        title="Tukar Tarikh Temu Janji Baru"
+                        title="Change Appointment Date"
                       >
-                        Tukar Tarikh
+                        Change Date
                       </button>
                     </div>
                   </div>
@@ -1629,14 +1629,14 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
                           <button
                             onClick={() => handleUpdateRemarks(p.id, 'done pekab40')}
                             className="text-[9px] font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white px-1.5 py-0.5 rounded-md transition-all cursor-pointer shadow-2xs flex items-center gap-0.5"
-                            title="Sahkan Dah Done PeKa B40"
+                            title="Confirm Done PeKa B40"
                           >
                             <Check className="w-2.5 h-2.5" /> Done
                           </button>
                           <button
                             onClick={() => handleUpdateRemarks(p.id, 'missed appointment')}
                             className="text-[9px] font-extrabold bg-orange-600 hover:bg-orange-700 text-white px-1.5 py-0.5 rounded-md transition-all cursor-pointer shadow-2xs flex items-center gap-0.5"
-                            title="Sahkan Missed Appointment"
+                            title="Confirm Missed Appointment"
                           >
                             <X className="w-2.5 h-2.5" /> Missed
                           </button>
