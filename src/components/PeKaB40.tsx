@@ -22,7 +22,8 @@ import {
   ArrowRight,
   CheckCircle,
   Download,
-  Check
+  Check,
+  Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
@@ -392,13 +393,17 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     'appt given',
     'missed appointment',
     'not contacted yet',
-    'done pekab40'
+    'done pekab40',
+    'semenyih'
   ];
 
   const normalizeRemarks = (remarks: string | null | undefined): string => {
     if (!remarks) return 'not contacted yet';
     const clean = remarks.trim().toLowerCase();
     
+    if (clean === 'semenyih' || clean.includes('semenyih')) {
+      return 'semenyih';
+    }
     if (clean === 'refuse' || clean.includes('refuse') || clean.includes('tolak')) {
       return 'refuse';
     }
@@ -459,6 +464,7 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     if (!option) return '';
     const o = option.trim().toLowerCase();
     if (o === 'done pekab40') return 'Done PeKa B40';
+    if (o === 'semenyih') return 'Semenyih';
     if (o === 'appt given') return 'Appt Given';
     if (o === 'contacted') return 'Contacted';
     if (o === 'to call again') return 'Contacted';
@@ -1091,6 +1097,9 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
     if (s === 'done pekab40') {
       return 'bg-sky-50 text-sky-700 border border-sky-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
+    if (s === 'semenyih') {
+      return 'bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
+    }
     if (s === 'contacted' || s === 'to call again' || s === 'whatsapp sent') {
       return 'bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase';
     }
@@ -1267,6 +1276,19 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
           </div>
           <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-xl flex items-center justify-center shrink-0">
             <CheckCircle className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* Semenyih */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-extrabold text-purple-700 uppercase tracking-widest block">Semenyih</span>
+            <span className="text-3xl font-black text-purple-600 block mt-1">
+              {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'semenyih').length}
+            </span>
+          </div>
+          <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-xl flex items-center justify-center shrink-0">
+            <Building2 className="w-6 h-6" />
           </div>
         </div>
       </div>
