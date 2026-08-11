@@ -53,6 +53,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
     patientName: '',
     patientPhone: '',
     branch: (normalizeBranch(currentUser.branch) || 'Kajang') as ClinicBranch,
+    panel: '',
     diagnosis: '',
     lastVisitDate: '',
     appointmentDate: '',
@@ -375,7 +376,7 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Clinic Branch</label>
               <select 
@@ -387,6 +388,16 @@ export default function CaseForm({ onClose, onSubmit, existingCases, currentUser
                 <option value="Kajang">Kajang</option>
                 <option value="Seri Kembangan">Seri Kembangan</option>
               </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Panel (Optional)</label>
+              <input 
+                type="text"
+                value={formData.panel}
+                onChange={e => setFormData({...formData, panel: e.target.value})}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                placeholder="e.g. AIA, PMCare"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Follow Up Tag</label>
