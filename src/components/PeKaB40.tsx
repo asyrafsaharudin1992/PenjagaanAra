@@ -1176,119 +1176,119 @@ export default function PeKaB40({ currentUser }: PeKaB40Props) {
       </div>
 
       {/* Quick stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
         {/* Total Records */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Total Records</span>
-            <span className="text-3xl font-black text-slate-900 block mt-1">{statsBaseList.length}</span>
+            <span className="text-2xl font-black text-slate-900 block mt-1">{statsBaseList.length}</span>
           </div>
-          <div className="w-12 h-12 bg-slate-50 text-slate-750 border border-slate-100 rounded-xl flex items-center justify-center shrink-0">
-            <Users className="w-6 h-6" />
+          <div className="w-10 h-10 bg-slate-50 text-slate-750 border border-slate-100 rounded-xl flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5" />
           </div>
         </div>
 
         {/* Not Contacted Yet */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block">Not Contacted Yet</span>
-            <span className="text-3xl font-black text-slate-700 block mt-1">
+            <span className="text-2xl font-black text-slate-700 block mt-1">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'not contacted yet').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-slate-50 text-slate-650 border border-slate-100 rounded-xl flex items-center justify-center shrink-0">
-            <User className="w-6 h-6" />
+          <div className="w-10 h-10 bg-slate-50 text-slate-650 border border-slate-100 rounded-xl flex items-center justify-center shrink-0">
+            <User className="w-5 h-5" />
           </div>
         </div>
 
         {/* Appointments Set */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-widest block">Appointments Set</span>
-            <span className="text-3xl font-black text-emerald-600 block mt-1">
+            <span className="text-2xl font-black text-emerald-600 block mt-1">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'appt given').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center shrink-0">
-            <Calendar className="w-6 h-6" />
+          <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center shrink-0">
+            <Calendar className="w-5 h-5" />
           </div>
         </div>
 
         {/* Missed Appointment */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-extrabold text-orange-750 uppercase tracking-widest block font-sans">Missed Appointment</span>
-            <span className="text-3xl font-black text-orange-600 block mt-1 font-sans">
+            <span className="text-[10px] font-extrabold text-orange-750 uppercase tracking-widest block font-sans">Missed Appt</span>
+            <span className="text-2xl font-black text-orange-600 block mt-1 font-sans">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'missed appointment').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
-            <CalendarX className="w-6 h-6" />
+          <div className="w-10 h-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
+            <CalendarX className="w-5 h-5" />
           </div>
         </div>
 
         {/* Contacted */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-widest block font-sans">Contacted</span>
-            <span className="text-3xl font-black text-indigo-600 block mt-1 font-sans">
+            <span className="text-2xl font-black text-indigo-600 block mt-1 font-sans">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'contacted' || getPatientRemarksStatus(p) === 'to call again').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center shrink-0">
-            <Clock className="w-6 h-6" />
+          <div className="w-10 h-10 bg-indigo-50 text-indigo-750 rounded-xl flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5" />
           </div>
         </div>
 
         {/* Unable to Contact */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-rose-700 uppercase tracking-widest block">Unable to Contact</span>
-            <span className="text-3xl font-black text-rose-600 block mt-1">
+            <span className="text-2xl font-black text-rose-600 block mt-1">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'unable to contact').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center shrink-0">
-            <Smartphone className="w-6 h-6" />
+          <div className="w-10 h-10 bg-rose-50 text-rose-700 rounded-xl flex items-center justify-center shrink-0">
+            <Smartphone className="w-5 h-5" />
           </div>
         </div>
 
         {/* Closed / Refused */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-widest block">Closed / Refused</span>
-            <span className="text-3xl font-black text-amber-600 block mt-1">
+            <span className="text-2xl font-black text-amber-600 block mt-1">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'refuse').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-amber-50 text-amber-700 rounded-xl flex items-center justify-center shrink-0">
-            <AlertCircle className="w-6 h-6" />
+          <div className="w-10 h-10 bg-amber-50 text-amber-700 rounded-xl flex items-center justify-center shrink-0">
+            <AlertCircle className="w-5 h-5" />
           </div>
         </div>
 
         {/* Done PeKa B40 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-teal-700 uppercase tracking-widest block">Done PeKa B40</span>
-            <span className="text-3xl font-black text-teal-600 block mt-1">
+            <span className="text-2xl font-black text-teal-600 block mt-1">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'done pekab40').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-teal-50 text-teal-700 rounded-xl flex items-center justify-center shrink-0">
-            <CheckCircle className="w-6 h-6" />
+          <div className="w-10 h-10 bg-teal-50 text-teal-700 rounded-xl flex items-center justify-center shrink-0">
+            <CheckCircle className="w-5 h-5" />
           </div>
         </div>
 
         {/* Semenyih */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-purple-700 uppercase tracking-widest block">Semenyih</span>
-            <span className="text-3xl font-black text-purple-600 block mt-1">
+            <span className="text-2xl font-black text-purple-600 block mt-1">
               {statsBaseList.filter(p => getPatientRemarksStatus(p) === 'semenyih').length}
             </span>
           </div>
-          <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-xl flex items-center justify-center shrink-0">
-            <Building2 className="w-6 h-6" />
+          <div className="w-10 h-10 bg-purple-50 text-purple-700 rounded-xl flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5" />
           </div>
         </div>
       </div>
