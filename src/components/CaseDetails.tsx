@@ -108,6 +108,7 @@ export default function CaseDetails({
   const [editedDiagnosis, setEditedDiagnosis] = useState(caseData.diagnosis || '');
   const [editedTag, setEditedTag] = useState(caseData.followUpTag);
   const [editedBranch, setEditedBranch] = useState(caseData.branch || 'Kajang');
+  const [editedPanel, setEditedPanel] = useState(caseData.panel || '');
   const [editedDoctorInCharge, setEditedDoctorInCharge] = useState(caseData.doctorInCharge || '');
   const [editedFollowUpDoneBy, setEditedFollowUpDoneBy] = useState(caseData.followUpDoneBy || '');
   const [editedAppointmentDate, setEditedAppointmentDate] = useState(caseData.appointmentDate || '');
@@ -122,13 +123,14 @@ export default function CaseDetails({
     setEditedDiagnosis(caseData.diagnosis || '');
     setEditedTag(caseData.followUpTag);
     setEditedBranch(caseData.branch || 'Kajang');
+    setEditedPanel(caseData.panel || '');
     setEditedDoctorInCharge(caseData.doctorInCharge || '');
     setEditedFollowUpDoneBy(caseData.followUpDoneBy || '');
     setEditedAppointmentDate(caseData.appointmentDate || '');
     setEditedLastVisitDate(caseData.lastVisitDate || '');
     setEditedKeyInDate(caseData.createdAt ? caseData.createdAt.split('T')[0] : '');
     setEditedPatientPhone(caseData.patientPhone || '');
-  }, [caseData.id, caseData.createdAt, caseData.patientPhone]);
+  }, [caseData.id, caseData.createdAt, caseData.patientPhone, caseData.panel]);
 
   // --- ADDED: ANC and NCD field state ---
   const [ancFields, setAncFields] = useState<ANCFields>(defaultANCFields);
@@ -338,6 +340,7 @@ export default function CaseDetails({
         remarks: editedRemarks,
         diagnosis: editedDiagnosis,
         branch: editedBranch as ClinicBranch,
+        panel: editedPanel.trim(),
         doctorInCharge: editedDoctorInCharge,
         followUpDoneBy: editedFollowUpDoneBy,
         appointmentDate: editedAppointmentDate,
@@ -546,14 +549,26 @@ export default function CaseDetails({
                 </div>
                 <div>
                   <p className="font-bold text-slate-900 text-lg">{caseData.patientName}</p>
-                  <select 
-                    value={editedBranch}
-                    onChange={(e) => setEditedBranch(e.target.value as ClinicBranch)}
-                    className="mt-1 text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-950 rounded-full uppercase tracking-wider border-none focus:ring-2 focus:ring-indigo-950 outline-none cursor-pointer"
-                  >
-                    <option value="Kajang">Kajang Branch</option>
-                    <option value="Seri Kembangan">Seri Kembangan Branch</option>
-                  </select>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <select 
+                      value={editedBranch}
+                      onChange={(e) => setEditedBranch(e.target.value as ClinicBranch)}
+                      className="text-[10px] font-bold px-2 py-1 bg-indigo-50 text-indigo-950 rounded-full uppercase tracking-wider border-none focus:ring-2 focus:ring-indigo-950 outline-none cursor-pointer"
+                    >
+                      <option value="Kajang">Kajang Branch</option>
+                      <option value="Seri Kembangan">Seri Kembangan Branch</option>
+                    </select>
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 px-2 py-0.5 rounded-lg">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Panel:</span>
+                      <input 
+                        type="text"
+                        value={editedPanel}
+                        onChange={(e) => setEditedPanel(e.target.value)}
+                        placeholder="e.g. AIA, PMCare"
+                        className="text-xs font-medium text-slate-700 bg-transparent outline-none max-w-[130px]"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="text-right">
