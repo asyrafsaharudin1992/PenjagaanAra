@@ -48,6 +48,7 @@ export interface FollowUpCase {
   patientId: string; // User keyed-in ID (can be same for multiple follow-ups)
   patientName: string;
   branch: ClinicBranch;
+  panel?: string; // Optional Panel (e.g., AIA, PMCare, etc.)
   diagnosis: string;
   lastVisitDate: string;
   nextFollowUpDate: string;
